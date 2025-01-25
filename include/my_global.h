@@ -40,7 +40,9 @@ extern my_log_t my_log;
 extern int ngx_process;
 extern __sig_atomic_t ngx_reap;
 extern int g_stopEvent;  //标志程序退出,0不退出1，退出 
+extern int ngx_terminate;
 
-
+extern pid_t ngx_processes[]; //工作进程pid
+extern int ngx_last_process; // 工作进程数量
     
 }

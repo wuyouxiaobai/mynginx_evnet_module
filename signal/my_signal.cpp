@@ -85,67 +85,137 @@ int ngx_init_signals()
 }
 
 // 信号处理函数
-static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
-{
-    //printf("来信号了\n");    
-    ngx_signal_t *sig; // 信号数组指针
-    char *action; // 一个字符串，用于记录一个动作字符串以往日志文件中写
+// static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
+// {
+//     //printf("来信号了\n");    
+//     ngx_signal_t *sig; // 信号数组指针
+//     char *action; // 一个字符串，用于记录一个动作字符串以往日志文件中写
 
-    for (sig = signals; sig->signo != 0; sig++) //遍历信号数组    
-    {         
-        //找到对应信号，即可处理
-        if (sig->signo == signo) 
-        { 
-            break;
-        }
-    } //end for
+//     for (sig = signals; sig->signo != 0; sig++) //遍历信号数组    
+//     {         
+//         //找到对应信号，即可处理
+//         if (sig->signo == signo) 
+//         { 
+//             break;
+//         }
+//     } //end for
 
-    action = (char*)"";
+//     action = (char*)"";
     
-    if(ngx_process == NGX_PROCESS_MASTER) // master进程，管理进程，处理信号一般比较多
-    {
-        // master进程的信号处理
-        switch(signo)
-        {
-        case SIGCHLD: // 子进程退出时会收到该信号
-            ngx_reap = 1; // 设置ngx_reap标志，表示有子进程退出，日后master主进程的for(;;)循环中可能会用到这个变量【比如重新产生一个子进程】
-            break;
-        // ...日后根据需要再继续增加
-        default:
-            break;
+//     if(ngx_process == NGX_PROCESS_MASTER) // master进程，管理进程，处理信号一般比较多
+//     {
+//         // master进程的信号处理
+//         switch(signo)
+//         {
+//         case SIGCHLD: // 子进程退出时会收到该信号
+//             ngx_reap = 1; // 设置ngx_reap标志，表示有子进程退出，日后master主进程的for(;;)循环中可能会用到这个变量【比如重新产生一个子进程】
+//             break;
+//         // ...日后根据需要再继续增加
+//         default:
+//             break;
         
-        }
-    }
-    else if(ngx_process == NGX_PROCESS_WORKER) // worker进程，工作进程，处理信号一般比较少
-    {
-        //worker进程的往这里走
-        //......以后再增加
-        //....
-    }
-    else
-    {
-        //非master非worker进程，先啥也不干
-        //do nothing
-    }
+//         }
+//     }
+//     else if(ngx_process == NGX_PROCESS_WORKER) // worker进程，工作进程，处理信号一般比较少
+//     {
+//         //worker进程的往这里走
+//         //......以后再增加
+//         //....
+//     }
+//     else
+//     {
+//         //非master非worker进程，先啥也不干
+//         //do nothing
+//     }
 
-    // 记录日志
-    if(siginfo && siginfo->si_pid)
-    {
-        ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received from %P%s", signo, sig->signame, siginfo->si_pid, action); 
+//     // 记录日志
+//     if(siginfo && siginfo->si_pid)
+//     {
+//         ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received from %P%s", signo, sig->signame, siginfo->si_pid, action); 
     
-    }
-    else
-    {
-        ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received %s",signo, sig->signame, action);//没有发送该信号的进程id，所以不显示发送该信号的进程id
-    }
+//     }
+//     else
+//     {
+//         ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received %s",signo, sig->signame, action);//没有发送该信号的进程id，所以不显示发送该信号的进程id
+//     }
 
-    //.......其他需要扩展的将来再处理；
+//     //.......其他需要扩展的将来再处理；
     
-    //子进程状态有变化，通常是意外退出【既然官方是在这里处理，我们也学习官方在这里处理】
-    if (signo == SIGCHLD) 
-    {
-        ngx_process_get_status(); //获取子进程的结束状态
-    } 
+//     //子进程状态有变化，通常是意外退出【既然官方是在这里处理，我们也学习官方在这里处理】
+//     if (signo == SIGCHLD) 
+//     {
+//         ngx_process_get_status(); //获取子进程的结束状态
+//     } 
+// }
+
+static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)  
+{  
+    ngx_signal_t *sig; // 信号数组指针  
+    char *action; // 动作字符串，用于记录日志  
+
+    for (sig = signals; sig->signo != 0; sig++) // 遍历信号数组    
+    {         
+        if (sig->signo == signo)   
+        {   
+            break;  
+        }  
+    }  
+
+    action = (char*)"";  
+
+    if (ngx_process == NGX_PROCESS_MASTER) // master进程  
+    {  
+        switch (signo)  
+        {  
+        case SIGTERM: // 强制退出信号  
+            g_stopEvent = 1; // 设置退出标志，主进程和子进程都会退出  
+            action = (char *)"shutting down";  
+            break;  
+
+        case SIGQUIT: // 优雅退出信号  
+            g_stopEvent = 1; // 设置退出标志  
+            // ngx_terminate = 1; // 表示优雅退出，等待子进程完成任务  
+            action = (char *)"gracefully shutting down";  
+            break;  
+
+        case SIGCHLD: // 子进程退出  
+            ngx_reap = 1; // 设置标志，表示需要回收子进程  
+            break;  
+
+        default:  
+            break;  
+        }  
+    }  
+    else if (ngx_process == NGX_PROCESS_WORKER) // worker进程  
+    {  
+        switch (signo)  
+        {  
+        case SIGTERM:  
+        case SIGQUIT:  
+            g_stopEvent = 1; // worker进程也设置退出标志  
+            action = (char *)"exiting";  
+            break;  
+
+        default:  
+            break;  
+        }  
+    }  
+
+    // 记录日志  
+    if (siginfo && siginfo->si_pid)  
+    {  
+        ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received from %P %s", signo, sig->signame, siginfo->si_pid, action);  
+    }  
+    else  
+    {  
+        ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received %s", signo, sig->signame, action);  
+    }  
+
+    // 处理子进程状态变化  
+    if (signo == SIGCHLD)  
+    {  
+        ngx_process_get_status(); // 获取子进程的结束状态  
+    }  
 }
 
 

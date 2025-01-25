@@ -219,4 +219,5 @@ CMakeFiles/mynginx.dir/proc/my_process_cycle.cpp.o: \
  /usr/include/c++/11/bits/stl_raw_storage_iter.h \
  /usr/include/c++/11/bits/align.h /usr/include/c++/11/bit \
  /usr/include/c++/11/bits/shared_ptr_atomic.h \
- /usr/include/c++/11/backward/auto_ptr.h
+ /usr/include/c++/11/backward/auto_ptr.h \
+ /usr/include/x86_64-linux-gnu/sys/wait.h

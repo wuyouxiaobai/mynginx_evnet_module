@@ -30,3 +30,6 @@
 //进程类型
 #define NGX_PROCESS_MASTER     0  //master进程，管理进程
 #define NGX_PROCESS_WORKER     1  //worker进程，工作进程
+
+//子进程最大数量
+#define NGX_MAX_PROCESSES 1024

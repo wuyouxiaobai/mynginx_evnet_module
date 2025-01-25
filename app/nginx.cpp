@@ -32,6 +32,10 @@ pid_t ngx_pid; //当前进程
 pid_t ngx_parent; //父进程
 int ngx_process; //进程类型
 int g_stopEvent;//进程退出事，退出：1 继续：0
+int ngx_terminate;//进程优雅退出：1 继续：0
+pid_t ngx_processes[NGX_MAX_PROCESSES]; // 定义一个固定大小的数组  
+int ngx_last_process;//工作进程数量
+
 
 sig_atomic_t ngx_reap; //标记子进程状态变化[一般是子进程发来SIGCHLD信号表示退出],sig_atomic_t:系统定义的类型：访问或改变这些变量需要在计算机的一条指令内完成
                                    //一般等价于int【通常情况下，int类型的变量通常是原子访问的，也可以认为 sig_atomic_t就是int类型的数据】       
@@ -45,10 +49,12 @@ int main(int argc, char*const *argv)
     int exitcode = 0;           //退出代码，先给0表示正常退出
     int i;                      //临时用
     
-    WYXB::g_stopEvent = 0;            //标记程序是否退出，0不退出          
+    WYXB::g_stopEvent = 0;            //标记程序是否退出，0不退出    
+    WYXB::ngx_terminate = 0;          ////标记程序是否要优雅退出，0不终止      
     
     WYXB::ngx_pid = getpid();         //获取当前进程的PID
     WYXB::ngx_parent = getppid();      //获取父进程的PID
+    WYXB::ngx_last_process = 0;      //工作进程数量
     
     //统计argc所占内存
     WYXB::g_argvneedmem = 0;
@@ -120,7 +126,8 @@ int main(int argc, char*const *argv)
 
 lblexit:
     //(5)该释放的资源要释放掉
-    WYXB::ngx_log_stderr(0,"程序退出，再见了!");
+    if(WYXB::ngx_process == NGX_PROCESS_MASTER)
+        WYXB::ngx_log_stderr(0,"程序退出，再见了!");
     WYXB::freeresource();  //一系列的main返回前的释放动作函数
     //printf("程序退出，再见!\n");    
     return exitcode;

@@ -5,3 +5,111 @@
 2025-01-24 16:24:59 [notice] 33484: worker process 33484 【worker进程】启动并开始运行......!
 2025-01-24 16:24:59 [notice] 33482: worker process 33482 【worker进程】启动并开始运行......!
 2025-01-24 17:32:12 [notice] 33481: signal 3 (SIGQUIT) received from 27330
+2025-01-25 18:50:43 [stderr] 44122: nginx: CSocket::Initialize()中bind()失败;i=0. (98: Address already in use) 
+2025-01-25 18:50:43 [stderr] 44122: nginx: 程序退出，再见了!
+2025-01-25 18:52:37 [info] 44363: 监听端口8080成功
+2025-01-25 18:52:37 [notice] 44364: master process ./mynginx/bin/mynginx 44364 【master进程】启动并开始运行......!
+2025-01-25 18:52:38 [notice] 44368: worker process 44368 【worker进程】启动并开始运行......!
+2025-01-25 18:52:38 [notice] 44366: worker process 44366 【worker进程】启动并开始运行......!
+2025-01-25 18:52:38 [notice] 44367: worker process 44367 【worker进程】启动并开始运行......!
+2025-01-25 18:52:38 [notice] 44632: worker process 44632 【worker进程】启动并开始运行......!
+2025-01-25 18:53:50 [notice] 44364: signal 3 (SIGQUIT) received from 38474 gracefully shutting down
+2025-01-25 18:53:50 [notice] 44364: Master process exiting...
+2025-01-25 18:53:50 [notice] 44366: signal 15 (SIGTERM) received from 44364 exiting
+2025-01-25 18:53:50 [info] 44366: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:53:50 [stderr] 44366: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:53:50 [stderr] 44366: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:53:50 [stderr] 44366: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:53:50 [stderr] 44366: nginx: 当前时间队列大小(0)。
+2025-01-25 18:53:50 [stderr] 44366: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:53:50 [stderr] 44366: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:53:50 [notice] 44366: Worker process 44366 is exiting gracefully...
+2025-01-25 18:53:50 [notice] 44367: signal 15 (SIGTERM) received from 44364 exiting
+2025-01-25 18:53:50 [info] 44367: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:53:50 [stderr] 44367: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:53:50 [stderr] 44367: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:53:50 [stderr] 44367: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:53:50 [stderr] 44367: nginx: 当前时间队列大小(0)。
+2025-01-25 18:53:50 [stderr] 44367: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:53:50 [stderr] 44367: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:53:50 [notice] 44367: Worker process 44367 is exiting gracefully...
+2025-01-25 18:53:50 [notice] 44632: signal 15 (SIGTERM) received from 44364 exiting
+2025-01-25 18:53:50 [info] 44632: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:53:50 [stderr] 44632: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:53:50 [stderr] 44632: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:53:50 [stderr] 44632: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:53:50 [stderr] 44632: nginx: 当前时间队列大小(0)。
+2025-01-25 18:53:50 [stderr] 44632: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:53:50 [stderr] 44632: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:53:50 [notice] 44632: Worker process 44632 is exiting gracefully...
+2025-01-25 18:53:50 [notice] 44368: signal 15 (SIGTERM) received from 44364 exiting
+2025-01-25 18:53:50 [info] 44368: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:53:50 [stderr] 44368: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:53:50 [stderr] 44368: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:53:50 [stderr] 44368: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:53:50 [stderr] 44368: nginx: 当前时间队列大小(0)。
+2025-01-25 18:53:50 [stderr] 44368: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:53:50 [stderr] 44368: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:53:50 [notice] 44368: Worker process 44368 is exiting gracefully...
+2025-01-25 18:53:50 [stderr] 44366: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:53:50 [stderr] 44368: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:53:50 [stderr] 44367: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:53:50 [stderr] 44632: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:53:51 [notice] 44364: Worker process 44366 exited with status 0.
+2025-01-25 18:53:51 [notice] 44364: Worker process 44367 exited with status 0.
+2025-01-25 18:53:51 [notice] 44364: Worker process 44368 exited with status 0.
+2025-01-25 18:53:51 [notice] 44364: Worker process 44632 exited with status 0.
+2025-01-25 18:53:51 [stderr] 44364: nginx: 程序退出，再见了!
+2025-01-25 18:55:49 [info] 45193: 监听端口8080成功
+2025-01-25 18:55:49 [notice] 45194: master process ./mynginx/bin/mynginx 45194 【master进程】启动并开始运行......!
+2025-01-25 18:55:50 [notice] 45196: worker process 45196 【worker进程】启动并开始运行......!
+2025-01-25 18:55:50 [notice] 45195: worker process 45195 【worker进程】启动并开始运行......!
+2025-01-25 18:55:50 [notice] 45197: worker process 45197 【worker进程】启动并开始运行......!
+2025-01-25 18:55:50 [notice] 45199: worker process 45199 【worker进程】启动并开始运行......!
+2025-01-25 18:56:09 [notice] 45194: signal 3 (SIGQUIT) received from 38474 gracefully shutting down
+2025-01-25 18:56:09 [notice] 45194: Master process exiting...
+2025-01-25 18:56:09 [notice] 45195: signal 15 (SIGTERM) received from 45194 exiting
+2025-01-25 18:56:09 [info] 45195: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:56:09 [stderr] 45195: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:56:09 [stderr] 45195: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:56:09 [stderr] 45195: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:56:09 [stderr] 45195: nginx: 当前时间队列大小(0)。
+2025-01-25 18:56:09 [stderr] 45195: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:56:09 [stderr] 45195: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:56:09 [notice] 45195: Worker process 45195 is exiting gracefully...
+2025-01-25 18:56:09 [notice] 45197: signal 15 (SIGTERM) received from 45194 exiting
+2025-01-25 18:56:09 [info] 45197: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:56:09 [stderr] 45197: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:56:09 [stderr] 45197: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:56:09 [stderr] 45197: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:56:09 [stderr] 45197: nginx: 当前时间队列大小(0)。
+2025-01-25 18:56:09 [stderr] 45197: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:56:09 [stderr] 45197: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:56:09 [notice] 45197: Worker process 45197 is exiting gracefully...
+2025-01-25 18:56:09 [notice] 45199: signal 15 (SIGTERM) received from 45194 exiting
+2025-01-25 18:56:09 [info] 45199: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:56:09 [stderr] 45199: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:56:09 [stderr] 45199: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:56:09 [stderr] 45199: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:56:09 [stderr] 45199: nginx: 当前时间队列大小(0)。
+2025-01-25 18:56:09 [stderr] 45199: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:56:09 [stderr] 45199: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:56:09 [notice] 45199: Worker process 45199 is exiting gracefully...
+2025-01-25 18:56:09 [stderr] 45195: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:56:09 [notice] 45196: signal 15 (SIGTERM) received from 45194 exiting
+2025-01-25 18:56:09 [info] 45196: CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断. (4: Interrupted system call) 
+2025-01-25 18:56:09 [stderr] 45196: nginx: ------------------------------------begin--------------------------------------
+2025-01-25 18:56:09 [stderr] 45196: nginx: 当前在线人数/总人数(0/2048)。
+2025-01-25 18:56:09 [stderr] 45196: nginx: 连接池中空闲连接/总连接/要释放的连接(2047/2048/0)。
+2025-01-25 18:56:09 [stderr] 45196: nginx: 当前时间队列大小(0)。
+2025-01-25 18:56:09 [stderr] 45196: nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
+2025-01-25 18:56:09 [stderr] 45196: nginx: ------------------------------------end--------------------------------------
+2025-01-25 18:56:09 [notice] 45196: Worker process 45196 is exiting gracefully...
+2025-01-25 18:56:09 [stderr] 45199: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:56:09 [stderr] 45196: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:56:09 [stderr] 45197: nginx: CThreadPool::StopAll()成功返回，线程池中线程全部正常结束!
+2025-01-25 18:56:09 [notice] 45194: Worker process 45196 exited with status 0.
+2025-01-25 18:56:09 [notice] 45194: Worker process 45195 exited with status 0.
+2025-01-25 18:56:09 [notice] 45194: Worker process 45197 exited with status 0.
+2025-01-25 18:56:09 [notice] 45194: Worker process 45199 exited with status 0.
+2025-01-25 18:56:09 [stderr] 45194: nginx: 程序退出，再见了!

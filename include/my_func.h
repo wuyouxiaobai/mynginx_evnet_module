@@ -29,6 +29,7 @@ int ngx_init_signals();
 
 //守护进程
 int ngx_daemon();
+
 }
 
 

@@ -7,7 +7,7 @@
 #include <signal.h>
 #include "my_conf.h"
 #include "string.h"
-
+#include <sys/wait.h>
 
 
 namespace WYXB
@@ -17,7 +17,8 @@ static void ngx_start_worker_processes(int processnums);
 static int ngx_spawn_process(int threadnums,const char *pprocname);
 static void ngx_worker_process_cycle(int inum,const char *pprocname);
 static void ngx_worker_process_init(int inum);
-
+static void ngx_reap_worker_processes();
+static void ngx_signal_worker_processes(int signo);
 // 申明主进程
 static u_char master_process[] = "master process";
 
@@ -74,17 +75,65 @@ void ngx_master_process_cycle()
     int workprocess = config->GetIntDefault("WorkerProcesses", 1); // 工作进程的数量，默认为1
     ngx_start_worker_processes(workprocess);  //这里要创建worker子进程
 
-    //创建子进程后，父进程的执行流程会返回到这里，子进程不会走进来   
-    sigemptyset(&set); //信号屏蔽字为空，表示不屏蔽任何信号
 
-
-
-    for(;;)
+    if(ngx_process == NGX_PROCESS_MASTER)
     {
-        sigsuspend(&set); //阻塞在sigsuspend()，等待信号的到来，直到收到信号后，sigsuspend()返回，然后继续执行。
+        //创建子进程后，父进程的执行流程会返回到这里，子进程不会走进来   
+        sigemptyset(&set); //信号屏蔽字为空，表示不屏蔽任何信号
+
+
+
+        // for(;;)
+        // {
+        //     sigsuspend(&set); //阻塞在sigsuspend()，等待信号的到来，直到收到信号后，sigsuspend()返回，然后继续执行。
+        // }
+
+        // 主进程的主循环  
+        for (;;) {  
+            if (g_stopEvent) 
+            { 
+                // 如果收到退出信号，优雅退出  
+                ngx_log_error_core(NGX_LOG_NOTICE, 0, "Master process exiting...");  
+                ngx_signal_worker_processes(SIGTERM); // 通知所有子进程退出  
+
+                // 等待所有子进程退出  
+                ngx_reap_worker_processes();  
+
+                break; // 退出主循环  
+            }  
+
+            sigsuspend(&set); // 阻塞在这里，等待信号的到来  
+        }  
     }
+    
     return;
     
+}
+
+// 通知所有子进程退出  
+static void ngx_signal_worker_processes(int signo) {  
+    for (int i = 0; i < ngx_last_process; i++) {  
+        if (ngx_processes[i] == -1) {  
+            continue; // 跳过无效的子进程  
+        }  
+        kill(ngx_processes[i], signo); // 向子进程发送信号  
+    }  
+}  
+
+// 回收所有子进程  
+static void ngx_reap_worker_processes() {  
+    pid_t pid;  
+    int status;  
+
+    // 使用阻塞模式回收所有子进程  
+    while ((pid = waitpid(-1, &status, 0)) > 0) {  
+        ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P exited with status %d.", pid, WEXITSTATUS(status));  
+    }  
+
+    // 如果没有子进程，waitpid 会返回 -1，errno 会被设置为 ECHILD  
+    if (pid == -1 && errno != ECHILD) {  
+        ngx_log_error_core(NGX_LOG_ALERT, errno, "waitpid() failed while reaping worker processes.");  
+    }  
 }
 
 
@@ -96,7 +145,10 @@ static void ngx_start_worker_processes(int processnums)
     //创建子进程，由master进程执行该函数实现
     for(int i=0;i<processnums;i++)
     {
-        ngx_spawn_process(i, "worker process");
+        if(ngx_process == NGX_PROCESS_MASTER)
+            ngx_spawn_process(i, "worker process");
+        else
+            break;
     }
 
     
@@ -121,6 +173,8 @@ static int ngx_spawn_process(int inum,const char *pprocname)
         ngx_worker_process_cycle(inum,pprocname); //所有子进程在该函数循环处理请求
     
     default: //父进程直接退出
+        ngx_processes[inum] = pid;
+        ngx_last_process++;
         break;
     }
     //父进程分支会走到这里，子进程流程不往下边走-------------------------
@@ -133,6 +187,11 @@ static int ngx_spawn_process(int inum,const char *pprocname)
 //inum：进程编号【0开始】
 static void ngx_worker_process_cycle(int inum,const char *pprocname) 
 {
+    sigset_t empty_set;  
+    sigemptyset(&empty_set); // 清空信号屏蔽集  
+    if (sigprocmask(SIG_SETMASK, &empty_set, NULL) == -1) {  
+        perror("sigprocmask failed in child process");  
+    }  
 
     //设置一下变量
     ngx_process = NGX_PROCESS_WORKER;  //设置进程的类型，是worker进程
@@ -149,10 +208,21 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
 
     //暂时先放个死循环，我们在这个循环里一直不出来
     //setvbuf(stdout,NULL,_IONBF,0); //这个函数. 直接将printf缓冲区禁止， printf就直接输出了。
+    
+
+
     for(;;)
     {
+        // 检查退出标志  
+        if (g_stopEvent)   
+        {  
+            ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P is exiting gracefully...", ngx_pid);  
+            break; // 跳出循环，准备退出  
+        }  
         // 处理网络事件和定时器事件
         ngx_process_events_and_timers(); //处理网络事件和定时器事件
+
+
     }
     
     // 子进程退出
