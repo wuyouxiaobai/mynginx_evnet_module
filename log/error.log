@@ -1,0 +1,7 @@
+2025-01-24 16:24:58 [info] 33479: 监听端口8080成功
+2025-01-24 16:24:58 [notice] 33480: master process ./mynginx/bin/mynginx 33480 【master进程】启动并开始运行......!
+2025-01-24 16:24:59 [notice] 33483: worker process 33483 【worker进程】启动并开始运行......!
+2025-01-24 16:24:59 [notice] 33481: worker process 33481 【worker进程】启动并开始运行......!
+2025-01-24 16:24:59 [notice] 33484: worker process 33484 【worker进程】启动并开始运行......!
+2025-01-24 16:24:59 [notice] 33482: worker process 33482 【worker进程】启动并开始运行......!
+2025-01-24 17:32:12 [notice] 33481: signal 3 (SIGQUIT) received from 27330

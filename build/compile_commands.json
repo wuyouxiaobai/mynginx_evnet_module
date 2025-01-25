@@ -1,0 +1,97 @@
+[
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/app/my_conf.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/app/my_conf.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/app/my_conf.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/app/my_logger.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/app/my_logger.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/app/my_logger.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/app/my_printf.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/app/my_printf.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/app/my_printf.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/app/my_setproctitle.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/app/my_setproctitle.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/app/my_setproctitle.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/app/nginx.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/app/nginx.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/app/nginx.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/logic/my_slogic.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/logic/my_slogic.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/logic/my_slogic.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/misc/my_crc32.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/misc/my_crc32.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/misc/my_crc32.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/misc/my_memory.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/misc/my_memory.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/misc/my_memory.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/misc/my_threadpool.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/misc/my_threadpool.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/misc/my_threadpool.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/net/my_socket.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/net/my_socket.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/net/my_socket.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/net/my_socket_accept.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/net/my_socket_accept.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/net/my_socket_accept.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/net/my_socket_conn.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/net/my_socket_conn.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/net/my_socket_conn.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/net/my_socket_inet.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/net/my_socket_inet.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/net/my_socket_inet.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/net/my_socket_request.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/net/my_socket_request.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/net/my_socket_request.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/net/my_socket_time.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/net/my_socket_time.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/net/my_socket_time.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/proc/my_daemon.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/proc/my_daemon.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/proc/my_daemon.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/proc/my_event.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/proc/my_event.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/proc/my_event.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/proc/my_process_cycle.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/proc/my_process_cycle.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/proc/my_process_cycle.cpp"
+},
+{
+  "directory": "/home/wuyouxiaobai/Desktop/mynginx/build",
+  "command": "/usr/bin/g++  -I/home/wuyouxiaobai/Desktop/mynginx/include -g -std=gnu++14 -o CMakeFiles/mynginx.dir/signal/my_signal.cpp.o -c /home/wuyouxiaobai/Desktop/mynginx/signal/my_signal.cpp",
+  "file": "/home/wuyouxiaobai/Desktop/mynginx/signal/my_signal.cpp"
+}
+]
