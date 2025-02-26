@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/include"
+                "${workspaceFolder}/my_nginx_event/include",
+                "/usr/include/mysql"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

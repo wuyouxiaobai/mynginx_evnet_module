@@ -69,7 +69,10 @@
         "timer": "cpp",
         "future": "cpp",
         "cerrno": "cpp",
-        "cassert": "cpp"
+        "cassert": "cpp",
+        "codecvt": "cpp",
+        "iomanip": "cpp",
+        "valarray": "cpp"
     },
     "github.copilot.editor.enableCodeActions": false,
     "github.copilot.renameSuggestions.triggerAutomatically": false,

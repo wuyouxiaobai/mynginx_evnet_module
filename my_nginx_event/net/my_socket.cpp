@@ -229,7 +229,7 @@ bool CSocket::Initialize_subproc()
     int err;
     ThreadItem* pSendQueue; //专门用来发送数据的线程
     m_threadVector.push_back(pSendQueue = new ThreadItem(this)); //创建新线程并存入
-    err = pthread_create(&pSendQueue->_Handle, NULL, ServerSendQueueThread, pSendQueue); //创建线程
+    err = pthread_create(&pSendQueue->_Handle, NULL, ServerSendQueueThread, pSendQueue); //创建线程（从发送队列取消息然后发送）
     if(err != 0)
     {
         ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerSendQueueThread)失败.");

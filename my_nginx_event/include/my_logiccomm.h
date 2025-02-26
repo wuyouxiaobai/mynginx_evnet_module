@@ -16,7 +16,7 @@ typedef struct STRUCT_REGISTER
     int iType; // 类型
     char username[56]; //用户名
     char password[40]; //密码
-
+    bool bIsSuccess;
 
 }*LPSTRUCT_REGISTER;
 
@@ -25,6 +25,7 @@ typedef struct STRUCT_LOGIN
 {
     char username[56]; // 用户名
     char password[40]; //密码
+    bool bIsSuccess;
 }*LPSTRUCT_LOGIN;
 
 #pragma pack()

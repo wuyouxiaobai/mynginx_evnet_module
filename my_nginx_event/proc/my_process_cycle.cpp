@@ -249,7 +249,7 @@ static void ngx_worker_process_init(int inum)
     // 线程池代码，要比socket相关内容优先
     MyConf* config = MyConf::getInstance(); //初始化配置文件
     int tmpthreadnum = config->GetIntDefault("ProcMsgRecvWorkThreadCount", 5); // 处理接收消息线程池中线程的数量，默认为5
-    if(g_threadpool.Create(tmpthreadnum) == false)// 工作进程创建线程池中线程
+    if(g_threadpool.Create(tmpthreadnum) == false)// 工作进程创建线程池中线程（处理接受消息队列中的消息）
     {
         //内存没释放，但是简单粗暴退出；
         exit(-2);

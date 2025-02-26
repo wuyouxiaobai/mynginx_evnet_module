@@ -179,7 +179,7 @@ bool CLogicSocket::HandleRegister(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER p
     //(4)这里可能要考虑 根据业务逻辑，进一步判断收到的数据的合法性，
     //当前该玩家的状态是否适合收到这个数据等等【比如如果用户没登陆，它就不适合购买物品等等】
     // --------后序处理用户注册逻辑--------
-
+    
     //(5)给客户端返回数据时，一般也是返回一个结构，这个结构内容具体由客户端/服务器协商，这里我们就以给客户端也返回同样的 STRUCT_REGISTER 结构来举例    
     //LPSTRUCT_REGISTER pFromPkgHeader =  (LPSTRUCT_REGISTER)(((char *)pMsgHeader)+m_iLenMsgHeader);	//指向收到的包的包头，其中数据后续可能要用到
     LPCOMM_PKG_HEADER pPkgHeader;
