@@ -1,3 +1,0 @@
-/home/wuyouxiaobai/Desktop/mynginx/build/CMakeFiles/mynginx.dir
-/home/wuyouxiaobai/Desktop/mynginx/build/CMakeFiles/edit_cache.dir
-/home/wuyouxiaobai/Desktop/mynginx/build/CMakeFiles/rebuild_cache.dir
