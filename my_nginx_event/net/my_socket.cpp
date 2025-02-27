@@ -74,7 +74,7 @@ void CSocket::ReadConf()
 {
     MyConf* config = MyConf::getInstance();
     m_worker_connections = config->GetIntDefault("worker_connections", m_worker_connections); // epoll连接的最大项数
-    m_ListenPortCount = config->GetIntDefault("m_iListenPortCount", m_ListenPortCount); // 取得要监听的端口数量
+    m_ListenPortCount = config->GetIntDefault("ListenPortCount", m_ListenPortCount); // 取得要监听的端口数量
     m_RecyConnectionWaitTime = config->GetIntDefault("Sock_RecyConnectionWaitTime", m_RecyConnectionWaitTime); // 等待60s后才会回收
 
     m_ifkickTimeCount = config->GetIntDefault("Sock_WaitTimeEnable", 0); // 是否开启踢人时钟

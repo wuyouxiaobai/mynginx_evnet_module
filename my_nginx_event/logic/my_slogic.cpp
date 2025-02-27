@@ -45,7 +45,7 @@ bool CLogicSocket::Initialize()
 
 
 
-//处理收到的数据包，由线程池来调用本函数，本函数是一个单独的线程；
+//处理收到的数据包，由线程池来调用本函数（处理消息队列中的消息），本函数是一个单独的线程；
 void CLogicSocket::threadRecvProFunc(char* pMsgBuf)
 {
     LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)(pMsgBuf); // 消息头
