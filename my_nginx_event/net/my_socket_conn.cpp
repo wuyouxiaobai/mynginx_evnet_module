@@ -109,6 +109,7 @@ lpngx_connection_t CSocket::ngx_get_connection(int isock)
         m_freeConnectionList.pop_front();
         p_Conn->GetOneToUse();
         --m_free_connection_n; // 空闲连接数减1
+        ++m_onlineUserCount; //用户加1
         p_Conn->fd = isock; // 绑定fd
         return p_Conn;
     
@@ -120,6 +121,7 @@ lpngx_connection_t CSocket::ngx_get_connection(int isock)
     p_Conn->GetOneToUse();
     m_connectionList.push_back(p_Conn); // 所有连接都放在这里
     ++m_total_connection_n; // 总连接数加1
+    ++m_onlineUserCount; //用户加1
     p_Conn->fd = isock; // 绑定fd
     return p_Conn;
 }

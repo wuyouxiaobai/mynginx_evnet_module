@@ -8,6 +8,9 @@ project(test1)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# 设置构建类型为Debug以生成调试信息
+set(CMAKE_BUILD_TYPE Debug)
+
 # 包含目录（如果有头文件的话）
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
