@@ -8,6 +8,7 @@
 #include "my_comm.h"
 #include <sys/epoll.h>
 #include <map>
+#include <thread>
 
 
 
@@ -171,6 +172,7 @@ protected:
 private:
     struct ThreadItem
     {
+        std::thread _Thread;
         pthread_t _Handle; // 线程句柄
         CSocket* _pThis; // 记录线程指针
         bool ifrunning; // 线程是否正常启动，启动起来后，才允许调用stopAll()

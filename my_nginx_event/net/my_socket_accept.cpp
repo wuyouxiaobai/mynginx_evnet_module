@@ -117,6 +117,7 @@ void CSocket::ngx_event_accept(lpngx_connection_t oldc)// 建立连接
 
         newc->listening = oldc->listening; // 连接对象和监听对象关联，方便通过连接对象找监听对象【关联到监听端口】
         
+        ngx_log_stderr(0,"ngx_event_accept bind ......");
         newc->rhandler = &CSocket::ngx_read_request_handler; // 设置读事件处理函数
         newc->whandler = &CSocket::ngx_write_response_handler; // 设置写事件处理函数
 

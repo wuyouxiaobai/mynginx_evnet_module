@@ -12,7 +12,7 @@ namespace WYXB
 void CSocket::ngx_read_request_handler(lpngx_connection_t pConn) //设置数据来时的读回调函数
 {
     bool isflood = false; // 是否是flood攻击
-
+    ngx_log_stderr(errno,"CSocekt::ngx_read_request_handler() before recvproc" );
     // 收包
     ssize_t reco = recvproc(pConn, pConn->precvbuf, pConn->irecvlen);
     if(reco <= 0)
@@ -103,12 +103,13 @@ void CSocket::ngx_read_request_handler(lpngx_connection_t pConn) //设置数据�
 ssize_t CSocket::recvproc(lpngx_connection_t pConn, char *pBuf, ssize_t bufLen) //接受从客户端来的数据专用函数
 {
     ssize_t n;
-
+    ngx_log_stderr(errno,"CSocekt::recvproc() before recv" );
     n = recv(pConn->fd, pBuf, bufLen, 0);
-    
+    ngx_log_stderr(errno,"CSocekt::recvproc() size %d！", n);
     if(n == 0)
     {
         // 客户端关闭连接
+        ngx_log_stderr(errno,"CSocekt::recvproc()中客户端关闭连接！");
         zdClosesocketProc(pConn);
         return -1;
     

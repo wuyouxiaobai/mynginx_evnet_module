@@ -125,6 +125,9 @@ void CThreadPool::Call() //唤醒线程
 //线程入口函数，当用pthread_create()创建线程后，这个ThreadFunc()函数都会被立即执行；
 void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函数
 {
+
+
+
     ThreadItem* pThread = (ThreadItem*)threadData;
     CThreadPool* pThreadPool = pThread->_pThis;
 

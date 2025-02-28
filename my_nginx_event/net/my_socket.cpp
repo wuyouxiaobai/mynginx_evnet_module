@@ -9,7 +9,8 @@
 #include "my_memory.h"
 #include <sys/time.h>
 #include "my_global.h"
-
+#include <thread>
+#include <iostream>
 
 
 namespace WYXB
@@ -194,6 +195,7 @@ bool CSocket::setnonblocking(int sockfd)
 //子进程中执行的初始化函数
 bool CSocket::Initialize_subproc()
 {
+    ngx_log_stderr(0,"Initialize_subproc");
     //     //发消息互斥量初始化
     // if(pthread_mutex_init(&m_sendMessageQueueMutex, NULL)  != 0)
     // {        
@@ -236,14 +238,29 @@ bool CSocket::Initialize_subproc()
         return false;
     }
 
-    ThreadItem* pRecyconn; //专门用来回收连接的线程
-    m_threadVector.push_back(pRecyconn = new ThreadItem(this)); //创建新线程并存入
-    err = pthread_create(&pRecyconn->_Handle, NULL, ServerRecyConnectionThread, pRecyconn);
-    if(err != 0)
-    {
-        ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerRecyConnectionThread)失败.");
+    // ThreadItem* pRecyconn; //专门用来回收连接的线程
+    // m_threadVector.push_back(pRecyconn = new ThreadItem(this)); //创建新线程并存入
+    // err = pthread_create(&pRecyconn->_Handle, NULL, ServerRecyConnectionThread, pRecyconn);
+    // if(err != 0)
+    // {
+    //     ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerRecyConnectionThread)失败.");
+    //     return false;
+    // }
+    ThreadItem* pRecyconn = new ThreadItem(this); // 创建新线程对象
+    if (!pRecyconn) {
+        ngx_log_stderr(0, "CSocket::Initialize_subproc()中new ThreadItem失败.");
         return false;
     }
+    // 创建线程
+    try {
+        pRecyconn->_Thread = std::thread(ServerRecyConnectionThread, pRecyconn);
+    } catch (const std::exception& e) {
+        ngx_log_stderr(0, "CSocket::Initialize_subproc()中std::thread创建失败: %s", e.what());
+        delete pRecyconn; // 释放内存
+        return false;
+    }
+    // 将线程对象存入容器
+    m_threadVector.push_back(pRecyconn);
 
 
     if(m_ifkickTimeCount == 1)  //是否开启踢人时钟，1：开启   0：不开启
@@ -599,18 +616,34 @@ int CSocket::ngx_epoll_process_events(int timer)
         if(revents & EPOLLIN) //可读事件
         {
             // 读事件发生，处理读事件
-            (this->* (pConn->rhandler) )(pConn);  
+            ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生.");
+            if(revents & (EPOLLHUP|EPOLLERR|EPOLLRDHUP)) // 连接断开事件
+            {
+                // --pConn->iThrowsendCount; // 连接断开
+                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，连接断开.");
+                zdClosesocketProc(pConn);
+            }
+            else
+            {
+                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件.");
+                (this->* (pConn->rhandler) )(pConn);  
+            }
+
         }
 
         if(revents & EPOLLOUT) //可写事件
         {
             // 写事件发生，处理写事件
+            ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生.");
             if(revents & (EPOLLHUP|EPOLLERR|EPOLLRDHUP)) // 连接断开事件
             {
                 --pConn->iThrowsendCount; // 连接断开
+                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，连接断开.");
+                // zdClosesocketProc(pConn);
             }
             else
             {
+                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，正常写事件.");
                 (this->* (pConn->whandler) )(pConn); //如果有数据没有发送完毕，由系统驱动来发送，则这里执行的应该是 CSocekt::ngx_write_request_handler()
             }
         }
@@ -622,6 +655,7 @@ int CSocket::ngx_epoll_process_events(int timer)
 // 处理发送消息队列的线程
 void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数据的线程
 {
+    ngx_log_stderr(errno,"ServerSendQueueThread");
     ThreadItem* pThreadItem = static_cast<ThreadItem*>(threadData);
     CSocket* pSocket = pThreadItem->_pThis;
     int err;
@@ -638,6 +672,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
 
     while(g_stopEvent == 0) // 线程不退出
     {
+        ngx_log_stderr(0,"ServerSendQueueThread looping ... ...");
         //如果信号量值>0，则 -1(减1) 并走下去，否则卡这里卡着【为了让信号量值+1，可以在其他线程调用sem_post达到，实际上在CSocekt::msgSend()调用sem_post就达到了让这里sem_wait走下去的目的】
         //如果被某个信号中断，sem_wait也可能过早的返回，错误为EINTR；
         //整个程序退出之前，也要sem_post()一下，确保如果本线程卡在sem_wait()，也能走下去从而让本线程成功返回

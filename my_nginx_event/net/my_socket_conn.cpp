@@ -2,6 +2,7 @@
 #include "my_memory.h"
 #include <sys/unistd.h>
 #include "my_global.h"
+#include <iostream>
 
 
 namespace WYXB
@@ -168,8 +169,9 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
     m_recyconnectionList.push_back(p_Conn); // 等待SeverRecyConnectionThread线程会自动处理
     ++m_total_recyconnection_n;
     --m_onlineUserCount;
-    return;
+    ngx_log_stderr(errno,"inRecyConnectQueue   m_recyconnectionList size: %d", m_recyconnectionList.size());
 
+    return;
 
 
 }
@@ -177,6 +179,7 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
 // 处理连接回收的线程函数
 void* CSocket::ServerRecyConnectionThread(void* threadData)
 {
+    ngx_log_stderr(errno,"ServerRecyConnectionThread");
     ThreadItem* pThread = static_cast<ThreadItem*>(threadData);
     CSocket* pSocket = pThread->_pThis;
     
@@ -185,15 +188,16 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
     std::list<lpngx_connection_t>::iterator pos, posend;
     lpngx_connection_t p_Conn;
 
-    while(1)
+    while(g_stopEvent == 0)
     {
         // 每次直接休息200ms
+        ngx_log_stderr(errno,"ServerRecyConnectionThread before sleep m_total_connection_n: %d", pSocket->m_total_connection_n.load());
         usleep(200 * 1000);
-
+        g_socket.printTDInfo();
         if(pSocket->m_total_connection_n > 0)
         {
             currtime = time(NULL);
-            std::lock_guard<std::mutex> lock(pSocket->m_connectionListMutex); // 临界区
+            std::lock_guard<std::mutex> lock(pSocket->m_recyconnqueueMutex); // 临界区
 lblRRTD:
             // 遍历连接池，检查是否有连接需要回收
             pos = pSocket->m_recyconnectionList.begin();
@@ -219,13 +223,14 @@ lblRRTD:
                 // 可以释放
                 --pSocket->m_total_recyconnection_n; // 总回收连接数减1
                 pSocket->m_recyconnectionList.erase(pos); // 从回收连接池中删除
+                
                 pSocket->ngx_free_connection(p_Conn); // 归还连接
                 goto lblRRTD; // 继续下一个连接
             }
             
         }
 
-        if(g_stopEvent == 1) // 退出整个程序
+        if(g_stopEvent != 0) // 退出整个程序
         {
             if(pSocket->m_total_connection_n > 0)
             {
@@ -240,14 +245,16 @@ lblRRTD:
                     p_Conn = (*pos);
                     --pSocket->m_total_connection_n; // 总连接数减1
                     pSocket->m_connectionList.erase(pos); // 从连接池中删除
-                    pSocket->ngx_free_connection(p_Conn); // 归还连接
+                    // pSocket->ngx_free_connection(p_Conn); // 归还连接
                     goto lblRRTD2; // 继续下一个连接
                 }
 
             }   
+            break; // 退出线程
+            
         }
 
-        break; // 退出线程
+
     }
 
     return (void*)0;
