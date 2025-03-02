@@ -748,7 +748,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                         p_Conn->psendbuf = p_Conn->psendbuf + sendsize;
                         p_Conn->isendlen = p_Conn->isendlen - sendsize;
                         // 发送缓冲区满了，需要依赖系统通知来发送数据
-                        ++p_Conn->iThrowsendCount; // 标记发送缓冲区满了。需要通过epoll事件驱动消息来继续发送
+                        ++p_Conn->iThrowsendCount; //ThrowsendCount用来标记连接还有未发送的数据注册到epoll上，保证后序在将所有数据都发送后才能释放Conn
                         // 依赖ngx_write_request_handler()来发送数据，这里不做处理，等待系统通知
                         if(pSocket->ngx_epoll_oper_event(
                                 p_Conn->fd,         //socket句柄

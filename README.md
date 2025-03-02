@@ -21,7 +21,10 @@ client -> server
 - thread pool 从 recv 队列中取出数据，解析后调用对应的回调函数。
 - 回调函数将数据放入 send 队列（m_MsgSendQueue）。
 - worker 中的发送线程将 send 队列中的数据记录在 Conn 的 psendbuf 中（psendMemPointer 用来释放分配的缓存），然后发送给 client。
-- （如果没有发送完，会注册到 epoll 上，使用默认的LT（避免漏掉一些数据），当发送缓冲区可写时，主线程调用 `ngx_write_response_handler` 继续发送。）
+- （如果没有发送完，会注册到 epoll 上，使用默认的LT（避免漏掉一些数据），当发送缓冲区可写时，主线程调用 `ngx_write_response_handler` 继续发送。iThrowsendCount用来标记连接还有未发送的数据注册到epoll上，保证后序在将所有数据都发送后才能释放Conn）
+
+client -》 server -》 epoll将唤醒对应连接解析消息 -》 放入Recv队列 -》 调用注册的业务函数处理 -》 放入send队列 -》 发送线程从中取出数据发送
+
 
 ## 心跳检测和超时踢人
 时间队列（时间，LPSTRUC_MSG_HEADER）
@@ -52,7 +55,7 @@ client -> server
 ## 连接池回收
 - 1、超时踢人回收 DeleteFromTimerQueue删除时间队列中的连接，把回收连接加入回收队列inRecyConnectQueue，等待Sock_RecyConnectionWaitTime超时后释放连接
 
-- 2、客户端断开连接后回收？？？？？？？？？？？
+- 2、客户端断开连接后epoll调用EPOLLIN的回调函数，把连接加入回收队列inRecyConnectQueue，等待Sock_RecyConnectionWaitTime超时后释放连接，free_connection回收连接
 
 - ServerRecyConnectionThread连接池回收线程回收连接，首先++iCurrsequence控制连接序号，然后通过psendMemPointer和precvMemPointer释放接受和发送数据，关闭fd，然后放回连接池。
 
@@ -61,17 +64,20 @@ client -> server
 kill 主进程pid
 
 
-## 问题？？？？？
-1、多连接时出错，会中断其他连接
-2、客户端断开连接后回收，连接回收异常
-3、iThrowsendCount用来控制客户端断开？，
-4、iThrowsendCount的作用
-5、连接断开死锁或者阻塞
+## 收包情况不在预料中
+- 收到错误包或恶意包（包头记录错误）会清空分配给fd的Conn的recv缓冲区，然后继续等待后序的数据
+- 如果发送的数据不到包头大小，Conn会继续在epoll_wait中等待，收到完整的数据包。
+- 如果Conn长时间等待，超时后会被放到回收队列进行回收。
+- 如果发包过于频繁，同样会断开连接，同时会将Conn回收。泛洪攻击（指定时间内收到超过预期数量的包就认为收到了攻击）
 
-nginx: ------------------------------------begin--------------------------------------
-nginx: 当前在线人数/总人数(2/2048)。
-nginx: 连接池中空闲连接/总连接/要释放的连接(2046/2048/0)。
-nginx: 当前时间队列大小(1)。
-nginx: 当前收消息队列/发消息队列大小分别为(0/0)，丢弃的待发送数据包数量为0。
-nginx: ------------------------------------end--------------------------------------
+
+## 消息队列中数据量过多
+- m_MsgSendQueue.size() > 50000，整个队列堆积的消息过多，会丢弃后序来到队列的消息m_iDiscardSendPkgCount++
+- p_Conn->iSendCount > 400，一条连接堆积的消息过多，同样会丢弃后序来到队列的消息m_iDiscardSendPkgCount++
+
+## 问题？？？？？
+4、iThrowsendCount的作用，用来标记
+
+
+
 - 监听事件会占有一个连接和一个用户名额

@@ -62,7 +62,7 @@ struct ngx_connection_s
     std::mutex logicPorcMutex;
 
     // 发包相关
-    std::atomic<int> iThrowsendCount; //如果发送缓冲区满了，需要通过epoll事件驱动消息继续发送，如果发送缓冲区满，用这个变量
+    std::atomic<int> iThrowsendCount; //iThrowsendCount的作用，用来标记
     char *psendMemPointer; // 发送完成后释放【消息头 + 包头 + 包体】
     char *psendbuf; // 发送数据缓冲区头指针，【包头+包体】
     unsigned int isendlen; // 要发送多少数据

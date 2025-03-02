@@ -191,7 +191,7 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
     while(g_stopEvent == 0)
     {
         // 每次直接休息200ms
-        ngx_log_stderr(errno,"ServerRecyConnectionThread before sleep m_total_connection_n: %d", pSocket->m_total_connection_n.load());
+        // ngx_log_stderr(errno,"ServerRecyConnectionThread before sleep m_total_connection_n: %d", pSocket->m_total_connection_n.load());
         usleep(200 * 1000);
         g_socket.printTDInfo();
         if(pSocket->m_total_connection_n > 0)
@@ -208,11 +208,9 @@ lblRRTD:
                 if((p_Conn->inRecyTime + pSocket->m_RecyConnectionWaitTime > currtime) && (g_stopEvent == 0))
                     continue;
 
-                //到释放的时间了: 
-                //......这将来可能还要做一些是否能释放的判断[在我们写完发送数据代码之后吧]，先预留位置
-                //....
 
-                //我认为，凡是到释放时间的，iThrowsendCount都应该为0；这里我们加点日志判断下
+
+                
                 if(p_Conn->iThrowsendCount > 0)
                 {
                     //这确实不应该，打印个日志吧；
@@ -245,8 +243,8 @@ lblRRTD:
                     p_Conn = (*pos);
                     --pSocket->m_total_connection_n; // 总连接数减1
                     pSocket->m_connectionList.erase(pos); // 从连接池中删除
-                    // pSocket->ngx_free_connection(p_Conn); // 归还连接
-                    goto lblRRTD2; // 继续下一个连接
+                    // pSocket->ngx_free_connection(p_Conn); // 可能有异常
+                    goto lblRRTD2; // 进行下一次
                 }
 
             }   
