@@ -263,7 +263,8 @@ static void ngx_worker_process_init(int inum)
         exit(-2);
     }
 
-    //如下这些代码参照官方nginx里的ngx_event_process_init()函数中的代码
+
+    //工作线程中创建listenfd，所有工作线程通过端口重用监听同一个端口，通过linux内核解决的负载均衡解决惊群问题
     g_socket.ngx_epoll_init();           //初始化epoll相关内容，同时 往监听socket上增加监听事件，从而开始让监听端口履行其职责
     //g_socket.ngx_epoll_listenportstart();//往监听socket上增加监听事件，从而开始让监听端口履行其职责【如果不加这行，虽然端口能连上，但不会触发ngx_epoll_process_events()里边的epoll_wait()往下走】
     
