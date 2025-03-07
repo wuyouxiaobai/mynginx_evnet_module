@@ -23,6 +23,7 @@ file(GLOB_RECURSE SOURCES
     proc/*.cpp
     signal/*.cpp
     app/*.cpp
+    registHandler/*.cpp
 )
 
 # 设置可执行文件的输出目录

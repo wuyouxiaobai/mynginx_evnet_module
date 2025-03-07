@@ -3,6 +3,7 @@
 #include <functional>
 #include <unordered_map>
 #include <registHandler.h>
+#include "my_http.h"
 
 namespace WYXB
 {
@@ -29,6 +30,9 @@ private:
     std::mutex m_handlerMutex; // 保证线程安全
     std::shared_ptr<RegistHandler> m_pRegistHandler;
 
+    // http相关
+    std::shared_ptr<HttpGetProcessor> m_httpGetProcessor;
+
 public:
     // 新增动态注册方法
     void RegisterHandle(uint16_t msgCode, HandlerFunc handler) ;
@@ -45,6 +49,8 @@ public:
 
 public:
     virtual void threadRecvProFunc(char* pMsgBuf);
+
+    void ngx_http_read_request_handler(lpngx_connection_t pConn);
 
 
 };

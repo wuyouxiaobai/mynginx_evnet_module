@@ -601,7 +601,7 @@ int CSocket::ngx_epoll_process_events(int timer)
         return 0; //非正常返回 
     }
 
-    // 惊群，一个telnet连接，4个worker进程都被惊动
+
 
     // 有事件收到了
     lpngx_connection_t pConn;

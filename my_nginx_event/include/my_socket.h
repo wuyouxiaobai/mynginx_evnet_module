@@ -125,8 +125,9 @@ private:
     void ngx_write_response_handler(lpngx_connection_t pConn); //设置数据发出时的写回调函数
     void ngx_close_connection(lpngx_connection_t pConn); //设置连接关闭时的回调函数
 
-
+protected:
     ssize_t recvproc(lpngx_connection_t pConn, char *pBuf, ssize_t bufLen); //接受从客户端来的数据专用函数
+private:
     void ngx_wait_request_handler_proc_p1(lpngx_connection_t pConn, bool &isflood);// 处理收到的数据【可能是只有包头】也可能【是包头+包体】
     void ngx_wait_request_handler_proc_plast(lpngx_connection_t pConn, bool &isflood); // 将处理过的数据放入消息队列，后序由各自线程处理
 

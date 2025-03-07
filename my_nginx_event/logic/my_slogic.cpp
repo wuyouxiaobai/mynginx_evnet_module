@@ -6,6 +6,7 @@
 #include "my_func.h"
 #include "my_memory.h"
 #include <cstring>
+#include "my_global.h"
 
 namespace WYXB
 {
@@ -44,6 +45,7 @@ bool CLogicSocket::Initialize()
     //....日后根据需要扩展        
     bool bParentInit = CSocket::Initialize();  //调用父类的同名函数
     m_pRegistHandler->Regist();
+    m_httpGetProcessor = std::make_shared<HttpGetProcessor>();
     return bParentInit;
 }
 
@@ -180,5 +182,25 @@ void CLogicSocket::SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t
 
 }
 
+
+
+void CLogicSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
+{
+    // bool isflood = false; // 是否是flood攻击
+    ngx_log_stderr(errno,"ngx_http_read_request_handler before recvproc" );
+
+    char pMsgBuf[2024];
+    // 收包
+    ssize_t reco = recvproc(pConn, pMsgBuf, 2024);
+    if(reco <= 0)
+    {
+        return;
+    }
+
+    //收到数据
+    auto params = m_httpGetProcessor->parseRequestLine(pMsgBuf);
+    std::string tmpstr = m_httpGetProcessor->buildHtmlResponse(params);
+    g_threadpool.inMsgRecvQueueAndSignal(const_cast<char*>(tmpstr.c_str()));
+}
 
 }

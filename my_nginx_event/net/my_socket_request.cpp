@@ -8,6 +8,8 @@
 namespace WYXB
 {
 
+
+
 // 来数据的时候处理，当连接上有数据来的时候，本函数会被ngx_epoll_process_events()调用
 void CSocket::ngx_read_request_handler(lpngx_connection_t pConn) //设置数据来时的读回调函数
 {
