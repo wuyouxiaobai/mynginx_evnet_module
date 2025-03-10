@@ -13,6 +13,7 @@ namespace WYXB
 ngx_connection_s::ngx_connection_s()
 {
     iCurrsequence = 0;
+
 }
 ngx_connection_s::~ngx_connection_s()
 {}
@@ -37,6 +38,11 @@ void ngx_connection_s::GetOneToUse()
     FloodAttackCount = 0; // Flood攻击在该时间内收到包的次数统计
     iSendCount = 0; // 发送队列中数据条目数，若client只发不收，此数可能过大，依据此数做踢出处理
 
+
+    // http相关
+    context_ = std::make_shared<HttpContext>();
+    ishttp = false;
+
 }
 
 // 回收连接做的事
@@ -56,6 +62,16 @@ void ngx_connection_s::PutOneToFree()
 
     iThrowsendCount = 0;
 
+    // http相关
+    ishttp = false;
+
+}
+
+
+// http获得
+std::shared_ptr<HttpContext> ngx_connection_s::getContext()
+{
+    return context_;
 }
 
 //---------------------------- 连接池相关函数实现 ----------
@@ -180,8 +196,12 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
 void* CSocket::ServerRecyConnectionThread(void* threadData)
 {
     ngx_log_stderr(errno,"ServerRecyConnectionThread");
-    ThreadItem* pThread = static_cast<ThreadItem*>(threadData);
-    CSocket* pSocket = pThread->_pThis;
+    auto pThreadItem = static_cast<ThreadItem*>(threadData);
+    if(pThreadItem->_pThis.lock() == nullptr)
+    {
+        return nullptr;
+    }
+    std::shared_ptr<CSocket> pSocket = pThreadItem->_pThis.lock();
     
     time_t currtime;
     int err;

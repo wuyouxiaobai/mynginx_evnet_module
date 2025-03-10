@@ -31,11 +31,11 @@ namespace WYXB
 
 // #define AUTH_TOTAL_COMMONS (sizeof(statusHandler) / sizeof(handler))//整个命令有多少个，编译时即可知道
 
-CLogicSocket::CLogicSocket()
-{
-    m_pRegistHandler = std::make_shared<RegistHandler>(RegistHandler(std::make_shared<CLogicSocket>(this)));
-}
-CLogicSocket::~CLogicSocket() = default;
+// CLogicSocket::CLogicSocket()
+// {
+//     m_pRegistHandler = std::make_shared<RegistHandler>(RegistHandler(std::make_shared<CLogicSocket>(this)));
+// }
+// CLogicSocket::~CLogicSocket() = default;
 
 //初始化函数【fork()子进程之前干这个事】
 //成功返回true，失败返回false
@@ -44,14 +44,14 @@ bool CLogicSocket::Initialize()
     //做一些和本类相关的初始化工作
     //....日后根据需要扩展        
     bool bParentInit = CSocket::Initialize();  //调用父类的同名函数
-    m_pRegistHandler->Regist();
-    m_httpGetProcessor = std::make_shared<HttpGetProcessor>();
+    InitHandler();
+    registerHandle();
     return bParentInit;
 }
 
 
 
-//处理收到的数据包，由线程池来调用本函数（处理消息队列中的消息），本函数是一个单独的线程；
+//处理接收消息队列中的消息，由线程池调用
 void CLogicSocket::threadRecvProFunc(char* pMsgBuf)
 {
     LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)(pMsgBuf); // 消息头
@@ -183,24 +183,5 @@ void CLogicSocket::SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t
 }
 
 
-
-void CLogicSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
-{
-    // bool isflood = false; // 是否是flood攻击
-    ngx_log_stderr(errno,"ngx_http_read_request_handler before recvproc" );
-
-    char pMsgBuf[2024];
-    // 收包
-    ssize_t reco = recvproc(pConn, pMsgBuf, 2024);
-    if(reco <= 0)
-    {
-        return;
-    }
-
-    //收到数据
-    auto params = m_httpGetProcessor->parseRequestLine(pMsgBuf);
-    std::string tmpstr = m_httpGetProcessor->buildHtmlResponse(params);
-    g_threadpool.inMsgRecvQueueAndSignal(const_cast<char*>(tmpstr.c_str()));
-}
 
 }

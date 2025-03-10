@@ -15,7 +15,7 @@
 
 namespace WYXB
 {
-CSocket::ThreadItem::ThreadItem(CSocket* pThis): _pThis(pThis), ifrunning(false){}
+CSocket::ThreadItem::ThreadItem(std::shared_ptr<CSocket>& pThis): _pThis(pThis){}
 CSocket::ThreadItem::~ThreadItem(){}
 
 CSocket::CSocket()
@@ -64,6 +64,7 @@ CSocket::~CSocket()
 bool CSocket::Initialize()
 {
     ReadConf();
+    // m_httpGetProcessor = std::make_shared<HttpGetProcessor>();
     if(ngx_open_listening_sockets() == false)
     {
         return false;
@@ -227,17 +228,13 @@ bool CSocket::Initialize_subproc()
         return false;
     }
 
-    // 创建线程
-    int err;
-    ThreadItem* pSendQueue; //专门用来发送数据的线程
-    m_threadVector.push_back(pSendQueue = new ThreadItem(this)); //创建新线程并存入
-    err = pthread_create(&pSendQueue->_Handle, NULL, ServerSendQueueThread, pSendQueue); //创建线程（从发送队列取消息然后发送）
-    if(err != 0)
-    {
-        ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerSendQueueThread)失败.");
-        return false;
-    }
-
+// 创建发送线程线程
+    auto pSendQueue = std::make_shared<ThreadItem>(shared_from_this()); //专门用来发送数据的线程
+    // 使用 lambda 捕获 shared_ptr，确保线程内对象存活
+    pSendQueue->_Thread = std::thread([pSendQueue]() {
+        ServerSendQueueThread(pSendQueue.get());  // 传递原始指针或智能指针
+    });
+    m_threadVector.push_back(std::move(pSendQueue)); //创建新线程并存入
     // ThreadItem* pRecyconn; //专门用来回收连接的线程
     // m_threadVector.push_back(pRecyconn = new ThreadItem(this)); //创建新线程并存入
     // err = pthread_create(&pRecyconn->_Handle, NULL, ServerRecyConnectionThread, pRecyconn);
@@ -246,33 +243,48 @@ bool CSocket::Initialize_subproc()
     //     ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerRecyConnectionThread)失败.");
     //     return false;
     // }
-    ThreadItem* pRecyconn = new ThreadItem(this); // 创建新线程对象
-    if (!pRecyconn) {
-        ngx_log_stderr(0, "CSocket::Initialize_subproc()中new ThreadItem失败.");
-        return false;
-    }
-    // 创建线程
-    try {
-        pRecyconn->_Thread = std::thread(ServerRecyConnectionThread, pRecyconn);
-    } catch (const std::exception& e) {
-        ngx_log_stderr(0, "CSocket::Initialize_subproc()中std::thread创建失败: %s", e.what());
-        delete pRecyconn; // 释放内存
-        return false;
-    }
-    // 将线程对象存入容器
-    m_threadVector.push_back(pRecyconn);
+
+// 创建回收线程
+    auto pRecyconn = std::make_shared<ThreadItem>(shared_from_this()); //专门用来发送数据的线程
+    pRecyconn->_Thread = std::thread([pRecyconn]() {
+        ServerRecyConnectionThread(pRecyconn.get());  // 传递原始指针或智能指针
+    });
+    m_threadVector.push_back(std::move(pRecyconn)); //创建新线程并存入
+    // if (!pRecyconn) {
+    //     ngx_log_stderr(0, "CSocket::Initialize_subproc()中new ThreadItem失败.");
+    //     return false;
+    // }
+    // // 创建线程
+    // try {
+    //     pRecyconn->_Thread = std::thread(ServerRecyConnectionThread, pRecyconn);
+    // } catch (const std::exception& e) {
+    //     ngx_log_stderr(0, "CSocket::Initialize_subproc()中std::thread创建失败: %s", e.what());
+    //     delete pRecyconn; // 释放内存
+    //     return false;
+    // }
+    // // 将线程对象存入容器
+    // m_threadVector.push_back(pRecyconn);
 
 
     if(m_ifkickTimeCount == 1)  //是否开启踢人时钟，1：开启   0：不开启
     {
-        ThreadItem* pTimemonitor; // 专门用来处理到时间不发心跳包的用户踢出
-        m_threadVector.push_back(pTimemonitor = new ThreadItem(this)); //创建新线程并存入
-        err = pthread_create(&pTimemonitor->_Handle,NULL, ServerTimerQueueMonitorThread,pTimemonitor);
-        if(err != 0)
-        {
-            ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerTimerQueueMonitorThread)失败.");
-            return false;
-        }
+// 创建超时踢人线程
+        auto pTimemonitor = std::make_shared<ThreadItem>(shared_from_this()); //专门用来发送数据的线程
+        pTimemonitor->_Thread = std::thread([pTimemonitor]() {
+            ServerTimerQueueMonitorThread(pTimemonitor.get());  // 传递原始指针或智能指针
+        });
+        m_threadVector.push_back(std::move(pTimemonitor)); //创建新线程并存入
+        // std::shared_ptr<ThreadItem> pTimemonitor = std::make_shared<ThreadItem>(shared_from_this()); // 专门用来处理到时间不发心跳包的用户踢出
+        // // 传递裸指针到线程，但需手动管理生命周期
+        // void* arg = new std::shared_ptr<ThreadItem>(pTimemonitor);  // 堆上创建 shared_ptr 的拷贝
+
+        // err = pthread_create(&pTimemonitor->_Handle,NULL, ServerTimerQueueMonitorThread,arg);
+        // if(err != 0)
+        // {
+        //     ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_create(ServerTimerQueueMonitorThread)失败.");
+        //     return false;
+        // }
+        // m_threadVector.push_back(pTimemonitor ); //创建新线程并存入
     }
 
     return true;
@@ -281,26 +293,26 @@ bool CSocket::Initialize_subproc()
 // 关闭退出函数【工作进程中执行】
 void CSocket::Shotdown_subproc()
 {
-    if(sem_post(&m_semEventSendQueue) == -1)
-    {
-        ngx_log_stderr(0,"CSocket::Shutdown_subproc()中sem_post(&m_semEventSendQueue)失败.");
+    // 1. 发送信号量通知线程退出
+    if (sem_post(&m_semEventSendQueue) == -1) {
+        ngx_log_stderr(0, "CSocket::Shutdown_subproc()中sem_post失败: errno=%d", errno);
     }
 
-    std::vector<ThreadItem*>::iterator iter;
-    for(iter = m_threadVector.begin(); iter != m_threadVector.end(); iter++)
-    {
-        pthread_join((*iter)->_Handle, NULL); // 等待线程完成自己的任务
+    // 2. 安全等待所有线程退出（RAII 管理）
+    for (auto& pItem : m_threadVector) {
+        if (pItem->_Thread.joinable()) {
+            try {
+                pItem->_Thread.join();
+            } catch (const std::exception& e) {
+                ngx_log_stderr(0, "线程等待失败: %s", e.what());
+            }
+        }
     }
-    //释放线程池中的线程
-    for(iter = m_threadVector.begin(); iter != m_threadVector.end(); iter++)
-    {
-        if(*iter)
-            delete *iter;
-        
-    }
-    m_threadVector.clear();
 
-    //清理队列
+    // 3. 自动释放内存（unique_ptr 管理）
+    m_threadVector.clear();  // unique_ptr 自动析构
+
+    // 4. 清理其他资源
     clearMsgSendQueue();
     clearconnection();
     clearAllFromTimerQueue();
@@ -457,6 +469,17 @@ void CSocket::printTDInfo()
     return;
 
 }
+
+
+
+
+
+
+
+
+
+
+// epoll相关的-------------------------
 
 //epoll功能初始化，子进程中进行，本函数被ngx_worker_process_init()所调用
 int CSocket::ngx_epoll_init()// epoll初始化
@@ -652,12 +675,23 @@ int CSocket::ngx_epoll_process_events(int timer)
     return 1; //正常返回
 }
 
+
+// epoll相关的-------------------------
+
+
+
+
+
 // 处理发送消息队列的线程
 void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数据的线程
 {
     ngx_log_stderr(errno,"ServerSendQueueThread");
-    ThreadItem* pThreadItem = static_cast<ThreadItem*>(threadData);
-    CSocket* pSocket = pThreadItem->_pThis;
+    auto pThreadItem = static_cast<ThreadItem*>(threadData);
+    if(pThreadItem->_pThis.lock() == nullptr)
+    {
+        return nullptr;
+    }
+    std::shared_ptr<CSocket> pSocket = pThreadItem->_pThis.lock();
     int err;
     std::list<char*>::iterator pos,pos2,posend;
 
@@ -697,41 +731,88 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
             posend = pSocket->m_MsgSendQueue.end();
             while(pos!= posend)
             {
-                pMsgbuf = *pos; // 拿到的消息【消息头+包头+包体】，不会将消息头发送给客户端
+                pMsgbuf = *pos; // 拿到的消息
                 pMsgHeader = (LPSTRUC_MSG_HEADER)pMsgbuf; // 指向消息头
-                pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgbuf + pSocket->m_iLenMsgHeader); // 指向包头
-                p_Conn = pMsgHeader->pConn; // 指向连接
 
-                if(p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
+                // 判断是http消息还是tcp连接的消息
+                if(pMsgHeader->pConn->ishttp)
                 {
-                    // 包序号错误，丢弃该包
+  
+                    p_Conn = pMsgHeader->pConn; // 指向连接
+
+                    if(p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
+                    {
+                        // 包序号错误，丢弃该包
+                        pos2 = pos;
+                        pos++;
+                        pSocket->m_MsgSendQueue.erase(pos2);
+                        --pSocket->m_iSendMsgQueueCount;
+                        memory.FreeMemory(pMsgbuf);
+                        continue;
+                    }
+    
+                    if(p_Conn->iThrowsendCount > 0)
+                    {
+                        pos++;
+                        continue;
+                    }
+    
+                    --p_Conn->iSendCount; // 发送计数减1
+    
+                    //可以发送消息了，一些必要的信息记录，要发送的东西也要从发送队列干掉
                     pos2 = pos;
                     pos++;
                     pSocket->m_MsgSendQueue.erase(pos2);
-                    --pSocket->m_iSendMsgQueueCount;
-                    memory.FreeMemory(pMsgbuf);
-                    continue;
+                    --pSocket->m_iSendMsgQueueCount; // 发送队列计数减1
+                    p_Conn->psendbuf = (char*)(pMsgbuf + pSocket->m_iLenMsgHeader); // 要发送数据的缓冲区指针
+                    p_Conn->isendlen = sizeof(pMsgbuf) - pSocket->m_iLenMsgHeader; // 要发送的数据长度
+                    sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); // 发送数据
+
                 }
 
-                if(p_Conn->iThrowsendCount > 0)
+                else
                 {
+                    pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgbuf + pSocket->m_iLenMsgHeader); // 指向包头
+                    p_Conn = pMsgHeader->pConn; // 指向连接
+    
+                    if(p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
+                    {
+                        // 包序号错误，丢弃该包
+                        pos2 = pos;
+                        pos++;
+                        pSocket->m_MsgSendQueue.erase(pos2);
+                        --pSocket->m_iSendMsgQueueCount;
+                        memory.FreeMemory(pMsgbuf);
+                        continue;
+                    }
+    
+                    if(p_Conn->iThrowsendCount > 0)
+                    {
+                        pos++;
+                        continue;
+                    }
+    
+                    --p_Conn->iSendCount; // 发送计数减1
+    
+                    //可以发送消息了，一些必要的信息记录，要发送的东西也要从发送队列干掉
+                    p_Conn->psendMemPointer = pMsgbuf; //用来释放内存
+                    pos2 = pos;
                     pos++;
-                    continue;
+                    pSocket->m_MsgSendQueue.erase(pos2);
+                    --pSocket->m_iSendMsgQueueCount; // 发送队列计数减1
+                    p_Conn->psendbuf = (char*)pPkgHeader; // 要发送数据的缓冲区指针
+                    itmp = ntohs(pPkgHeader->pkgLen); // 包长度【包头+包体】
+                    p_Conn->isendlen = itmp; // 要发送的数据长度
+    
+                    sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); // 发送数据
+    
                 }
 
-                --p_Conn->iSendCount; // 发送计数减1
 
-                //可以发送消息了，一些必要的信息记录，要发送的东西也要从发送队列干掉
-                p_Conn->psendMemPointer = pMsgbuf; //用来释放内存
-                pos2 = pos;
-                pos++;
-                pSocket->m_MsgSendQueue.erase(pos2);
-                --pSocket->m_iSendMsgQueueCount; // 发送队列计数减1
-                p_Conn->psendbuf = (char*)pPkgHeader; // 要发送数据的缓冲区指针
-                itmp = ntohs(pPkgHeader->pkgLen); // 包长度【包头+包体】
-                p_Conn->isendlen = itmp; // 要发送的数据长度
+ 
 
-                sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); // 发送数据
+
+
                 if(sendsize > 0)
                 {
                     if(sendsize == p_Conn->isendlen) // 全部发送
@@ -810,6 +891,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
     }
     return (void*)0;
 }
+
 
 
 }

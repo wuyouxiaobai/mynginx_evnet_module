@@ -10,13 +10,15 @@
 #include "my_func.h"
 #include <unistd.h>
 #include "my_global.h"
+#include <deque>
 
 
 namespace WYXB
 {
 
-class CThreadPool
+class CThreadPool : public std::enable_shared_from_this<CThreadPool>
 {
+    using Message = std::vector<uint8_t>;
 public:
     CThreadPool();
 
@@ -26,7 +28,7 @@ public:
     bool Create(int threadNum);
     void StopAll(); // 使线程池中的所有线程停止并退出
 
-    void inMsgRecvQueueAndSignal(char* buf);// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
+    void inMsgRecvQueueAndSignal(std::vector<uint8_t>&& buf);// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
     void Call(); //唤醒线程
 
     int getRecvMsgQueueCount(){return m_iRecvMsgQueueCount;} // 获取接收到的消息队列的数量
@@ -40,30 +42,35 @@ private:
 // 定义一个线程的结构
     struct ThreadItem
     {
-        pthread_t _Handle; // 线程句柄
-        CThreadPool* _pThis;// 记录线程池
-        bool ifrunning;// 标记是否正式启动
+        std::thread _Thread;
+        // pthread_t _Handle; // 线程句柄
+        std::weak_ptr <CThreadPool> _pThis; // 记录所属线程池
+        bool ifrunning; // 线程是否正常启动，启动起来后，才允许调用stopAll()
 
-        ThreadItem(CThreadPool* pThis) : _pThis(pThis), ifrunning(false) {}
+        ThreadItem(std::shared_ptr<CThreadPool>& pThis);
 
-        ~ThreadItem() {}
+        ~ThreadItem();
     };
 
 private:
-    std::mutex m_pthreadMutex; // 互斥锁
+
     std::condition_variable m_cv; // 条件变量
-    bool m_shutdown;// 线程退出标志，false不退出，true退出
+    std::atomic<bool> m_shutdown{false};    // 原子操作保证线程安全
 
-    int m_iThreadNum; // 线程池中线程的数量
+    std::atomic<int> m_iThreadNum; // 线程池中线程的数量
 
-    std::atomic<int> m_iRunningThreadNum; // 正在运行的线程数量
-    time_t  m_iLastEmgTime; // 上次发生线程不够用【紧急事件】的时间，防止日志报的太频繁
+    std::atomic<int> m_iRunningThreadNum{0}; // 正在运行的线程数量
+    std::atomic<time_t>  m_iLastEmgTime{0}; // 上次发生线程不够用【紧急事件】的时间，防止日志报的太频繁
     
-    std::vector<ThreadItem*> m_threadVector;// 线程容器
+    // 所有线程线程
+    std::mutex m_mutex;
+    std::vector<std::shared_ptr<ThreadItem>> m_threadVector;// 线程容器
 
     // 接受消息队列
-    std::list<char*> m_MsgRecvQueue; // 接收到的消息队列
-    int m_iRecvMsgQueueCount; // 接收到的消息队列的数量
+    std::mutex m_pthreadMutex; // 互斥锁
+    std::deque<Message> m_MsgRecvQueue; // 接收到的消息队列
+    std::atomic<int> m_iRecvMsgQueueCount{0}; // 接收到的消息队列的数量
+    
 
 };
 

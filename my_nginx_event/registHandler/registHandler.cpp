@@ -11,15 +11,20 @@ namespace WYXB
 {
 void RegistHandler::Regist()
 {
-    m_pLogicSocket->RegisterHandle(_CMD_PING, std::bind(&RegistHandler::HandlePing, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
-    m_pLogicSocket->RegisterHandle(_CMD_REGISTER, std::bind(&RegistHandler::HandleRegister, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
-    m_pLogicSocket->RegisterHandle(_CMD_LOGIN, std::bind(&RegistHandler::HandleLogin, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+
+
+    // 获取并验证智能指针
+    if (auto pSocket = m_pLogicSocket.lock()) 
+    {
+        pSocket->RegisterHandle(_CMD_PING, std::bind(&RegistHandler::HandlePing, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+        pSocket->RegisterHandle(_CMD_REGISTER, std::bind(&RegistHandler::HandleRegister, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+        pSocket->RegisterHandle(_CMD_LOGIN, std::bind(&RegistHandler::HandleLogin, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+    }
+
 }
 
-
-
-
-// 处理业务的逻辑
+// 根据GET这些调用对应回调函数（web）
+// 或者根据对应注册码调用对应回调函数（Tcp）
 bool RegistHandler::HandleRegister(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, uint16_t iBodyLength)
 {
     //(1)首先判断包体的合法性

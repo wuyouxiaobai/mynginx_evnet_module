@@ -7,7 +7,7 @@ namespace WYXB
 class RegistHandler
 {
 private:
-    std::shared_ptr<CLogicSocket> m_pLogicSocket;
+    std::weak_ptr<CLogicSocket> m_pLogicSocket;
 public:
     RegistHandler(std::shared_ptr<CLogicSocket> pLogicSocket):  m_pLogicSocket(pLogicSocket){}
     ~RegistHandler() = default;

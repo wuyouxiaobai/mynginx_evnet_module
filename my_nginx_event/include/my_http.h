@@ -10,7 +10,10 @@ namespace WYXB
 
 class HttpGetProcessor {
 
-friend CLogicSocket;
+
+    friend class CSocket;
+
+    
 public:
     // 构造函数：指定资源根目录和严格模式
     explicit HttpGetProcessor(const std::string& resourceRoot = "./www", 

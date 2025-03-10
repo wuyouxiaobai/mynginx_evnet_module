@@ -3,7 +3,7 @@
 #include <functional>
 #include <unordered_map>
 #include <registHandler.h>
-#include "my_http.h"
+
 
 namespace WYXB
 {
@@ -13,9 +13,18 @@ class CLogicSocket : public CSocket, public std::enable_shared_from_this<CLogicS
 friend RegistHandler;
 
 public:
-    CLogicSocket();
+    CLogicSocket() = default;
     virtual ~CLogicSocket();
     virtual bool Initialize();
+
+    void InitHandler() {
+        // 安全调用 shared_from_this()
+        m_pRegistHandler = std::make_shared<RegistHandler>(std::enable_shared_from_this<CLogicSocket>::shared_from_this());
+    }
+
+    void registerHandle() {
+        m_pRegistHandler->Regist();
+    }
 
 private:
     // 状态机核心数据结构
@@ -30,8 +39,7 @@ private:
     std::mutex m_handlerMutex; // 保证线程安全
     std::shared_ptr<RegistHandler> m_pRegistHandler;
 
-    // http相关
-    std::shared_ptr<HttpGetProcessor> m_httpGetProcessor;
+
 
 public:
     // 新增动态注册方法
@@ -50,7 +58,6 @@ public:
 public:
     virtual void threadRecvProFunc(char* pMsgBuf);
 
-    void ngx_http_read_request_handler(lpngx_connection_t pConn);
 
 
 };

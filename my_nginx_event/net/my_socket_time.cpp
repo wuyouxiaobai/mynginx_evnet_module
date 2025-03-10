@@ -127,8 +127,12 @@ void CSocket::clearAllFromTimerQueue()
 // 时间队列监听和处理线程，处理到期不发心跳包的用户踢出
 void* CSocket::ServerTimerQueueMonitorThread(void* threadData)
 {
-    ThreadItem* pThread = static_cast<ThreadItem*>(threadData);
-    CSocket* pSocket = pThread->_pThis;
+    auto pThreadItem = static_cast<ThreadItem*>(threadData);
+    if(pThreadItem->_pThis.lock() == nullptr)
+    {
+        return nullptr;
+    }
+    std::shared_ptr<CSocket> pSocket = pThreadItem->_pThis.lock();
     time_t absolute_time, curr_time;
     int err;
 

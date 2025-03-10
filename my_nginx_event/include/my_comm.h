@@ -9,7 +9,7 @@
 #define _PKG_BD_INIT 2 // 包头接受完，接受包体
 #define _PKG_BD_RECVING 3 // 接收包体
 
-#define _DATA_BUFSIZE_ 20 // 包头缓冲区大小
+#define _DATA_BUFSIZE_ 2024 // 包头缓冲区大小
 
 // 结构定义
 #pragma pack (1) // 对齐方式，1字节对齐【结构之间成员不做任何字节对齐，紧密排列在一起】

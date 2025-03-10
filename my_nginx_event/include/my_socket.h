@@ -9,6 +9,10 @@
 #include <sys/epoll.h>
 #include <map>
 #include <thread>
+#include "my_crc32.h"
+#include <memory>
+#include "my_http_context.h"
+
 
 
 
@@ -38,6 +42,7 @@ struct ngx_connection_s
     virtual ~ngx_connection_s();
     void GetOneToUse(); // 分配出去的时候初始化
     void PutOneToFree(); //回收回来的时候做一些事
+    std::shared_ptr<HttpContext> getContext(); // 获取HttpContext，用来解析http请求报文
 
     int fd; // 套接字句柄
     lpngx_listening_t listening; // 如果这个连接分配给了一个监听套接字，这里就指向监听套接字对应的lpngx_listening_t内存首地址
@@ -78,6 +83,9 @@ struct ngx_connection_s
 
     lpngx_connection_t next;
 
+    // http相关
+    std::atomic_bool ishttp;
+    std::shared_ptr<HttpContext> context_;
 };
 
 // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
@@ -90,7 +98,7 @@ typedef struct _STRUC_MSG_HEADER
 
 
 //socket
-class CSocket
+class CSocket : public std::enable_shared_from_this<CSocket>
 {
 public:
     CSocket();
@@ -123,6 +131,7 @@ private:
     void ngx_event_accept(lpngx_connection_t oldc);// 建立连接
     void ngx_read_request_handler(lpngx_connection_t pConn); //设置数据来时的读回调函数
     void ngx_write_response_handler(lpngx_connection_t pConn); //设置数据发出时的写回调函数
+
     void ngx_close_connection(lpngx_connection_t pConn); //设置连接关闭时的回调函数
 
 protected:
@@ -132,9 +141,9 @@ private:
     void ngx_wait_request_handler_proc_plast(lpngx_connection_t pConn, bool &isflood); // 将处理过的数据放入消息队列，后序由各自线程处理
 
     void clearMsgSendQueue(); // 处理发送消息队列
-    
+protected:
     ssize_t sendproc(lpngx_connection_t c, char* buff, ssize_t size);// 将数据发送到客户端
-
+private:
     // 获得对端信息相关
     size_t ngx_sock_ntop(struct sockaddr *sa, int port, u_char *text, size_t len); // 根据参数1获得对端信息，获得地址端口字符串，返回这个字符串长度
 
@@ -174,11 +183,11 @@ private:
     struct ThreadItem
     {
         std::thread _Thread;
-        pthread_t _Handle; // 线程句柄
-        CSocket* _pThis; // 记录线程指针
-        bool ifrunning; // 线程是否正常启动，启动起来后，才允许调用stopAll()
+        // pthread_t _Handle; // 线程句柄
+        std::weak_ptr <CSocket> _pThis; // 记录所属socket
+        // bool ifrunning; // 线程是否正常启动，启动起来后，才允许调用stopAll()
 
-        ThreadItem(CSocket* pThis);
+        ThreadItem(std::shared_ptr<CSocket>& pThis);
 
         ~ThreadItem();
     };
@@ -205,7 +214,7 @@ private:
     std::list<char*> m_MsgSendQueue; // 发送数据消息队列
     std::atomic<int> m_iSendMsgQueueCount; // 发送消息队列大小
     // 多线程相关
-    std::vector<ThreadItem*> m_threadVector; // 线程列表
+    std::vector<std::shared_ptr<ThreadItem>> m_threadVector; // 线程列表
     std::mutex m_sendMessageQueueMutex; // 发送消息队列互斥锁
     sem_t m_semEventSendQueue; // 处理发送消息相关的信号量
 
@@ -227,7 +236,11 @@ private:
     time_t m_lastprintTime; // 上次打印统计信息的时间【10s打印一次】
     int m_iDiscardSendPkgCount; // 丢弃发送消息包的次数
 
-
+private:
+    // http相关
+    void ngx_http_read_request_handler(lpngx_connection_t pConn); //设置http数据来时的读回调函数
+    void ngx_http_write_request_handler(lpngx_connection_t pConn); //设置http数据发出时的写回调函数
+    // std::shared_ptr<HttpGetProcessor> m_httpGetProcessor;
 
 };
 
