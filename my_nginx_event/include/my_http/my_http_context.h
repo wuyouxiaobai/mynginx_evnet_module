@@ -45,6 +45,17 @@ private:
 private:
     HttpRequestParseState state_;
     HttpRequest           request_;
+
+private:
+    std::string buffer_;       // 持久化接收缓冲区
+    size_t parsedPos_ = 0;     // 已解析位置
+
+public:
+    void append(char* buf, ssize_t n)
+    {
+        buffer_.append(buf, n);
+    }
+
 };
 
 } // namespace http

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <deque>
 #include <list>
 #include <mutex>
 #include <semaphore.h>
@@ -12,6 +13,7 @@
 #include "my_crc32.h"
 #include <memory>
 #include "my_http_context.h"
+#include <functional>
 
 
 
@@ -21,80 +23,173 @@
 
 namespace WYXB
 {
-typedef struct ngx_listening_s ngx_listening_t, *lpngx_listening_t;
-typedef struct ngx_connection_s ngx_connection_t, *lpngx_connection_t;
-typedef class CSocket CSocket;
+// typedef struct ngx_listening_s ngx_listening_t, *lpngx_listening_t;
+// typedef struct ngx_connection_s ngx_connection_t, *lpngx_connection_t;
+// typedef class CSocket CSocket;
 
-typedef void (CSocket::*ngx_event_handler_pt)(lpngx_connection_t c); // 定义成员函数指针
+// typedef void (CSocket::*ngx_event_handler_pt)(lpngx_connection_t c); // 定义成员函数指针
+
+class CSocket;
+struct ngx_listening_s;
+struct ngx_connection_s;
+
+using lpngx_listening_t = std::shared_ptr<ngx_listening_s>;
+using lpngx_connection_t = std::shared_ptr<ngx_connection_s>;
+using ngx_event_handler = std::function<void(lpngx_connection_t)>;
+
+
+
+
+
 
 // 一些专用结构定义放在这里，暂时不考虑放ngx_global.h里了
-struct ngx_listening_s // 和监听端口有关的结构
-{
-    int port;                      // 监听的端口号
-    int fd;                        // 套接字句柄socket
-    lpngx_connection_t connection; // 连接池中的一个连接，注意这是个指针
+// struct ngx_listening_s // 和监听端口有关的结构
+// {
+//     int port;                      // 监听的端口号
+//     int fd;                        // 套接字句柄socket
+//     lpngx_connection_t connection; // 连接池中的一个连接，注意这是个指针
+// };
+
+// 监听结构体优化
+struct ngx_listening_s {
+    int port = -1;
+    int fd = -1;
+    
+    // 使用weak_ptr避免循环引用
+    std::weak_ptr<ngx_connection_s> connection;  // 替换原始指针
+    
 };
 
-// 该结构表示一个Tcp连接【客户端主动发起，nginx服务器被动接受Tcp连接】
-struct ngx_connection_s
-{
+
+
+
+// // 该结构表示一个Tcp连接【客户端主动发起，nginx服务器被动接受Tcp连接】
+// struct ngx_connection_s
+// {
+//     ngx_connection_s();
+//     virtual ~ngx_connection_s();
+//     void GetOneToUse(); // 分配出去的时候初始化
+//     void PutOneToFree(); //回收回来的时候做一些事
+//     std::shared_ptr<HttpContext> getContext(); // 获取HttpContext，用来解析http请求报文
+
+//     int fd; // 套接字句柄
+//     lpngx_listening_t listening; // 如果这个连接分配给了一个监听套接字，这里就指向监听套接字对应的lpngx_listening_t内存首地址
+
+//     uint64_t iCurrsequence; 
+//     sockaddr s_sockaddr; // 保存对方地址信息
+
+//     // 和读有关
+//     ngx_event_handler_pt rhandler; // 读事件处理方法
+//     ngx_event_handler_pt whandler; // 写事件处理方法
+
+//     // epoll相关
+//     uint32_t events;
+
+//     // 收包相关
+//     unsigned char curStat; // 当前收包状态
+//     char dataHeadInfo[_DATA_BUFSIZE_]; // 保存收到的包头数据
+//     char *precvbuf; //接收数据的缓冲区
+//     unsigned int irecvlen; // 收到多少数据由这个变量指定
+//     char *precvMemPointer; // new出来的用于收包的内存首地址，释放用的
+
+//     // std::mutex logicPorcMutex;
+
+//     // 发包相关
+//     std::atomic<int> iThrowsendCount; //iThrowsendCount的作用，用来标记
+//     char *psendMemPointer; // 发送完成后释放【消息头 + 包头 + 包体】
+//     char *psendbuf; // 发送数据缓冲区头指针，【包头+包体】
+//     unsigned int isendlen; // 要发送多少数据
+
+//     // 回收相关
+//     time_t inRecyTime; 
+//     // 心跳包
+//     time_t lastPingTime;
+//     // 网络安全
+//     uint64_t FloodKickLastTime; // 上次受到攻击的时间
+//     int FloodAttackCount; // 受到攻击的次数
+//     std::atomic<int> iSendCount; //发送队列中的条目数
+
+//     // lpngx_connection_t next;
+
+//     // http相关
+//     std::atomic_bool ishttp;
+//     std::shared_ptr<HttpContext> context_;
+// };
+// 网络连接结构体现代化改造
+struct ngx_connection_s {
     ngx_connection_s();
-    virtual ~ngx_connection_s();
-    void GetOneToUse(); // 分配出去的时候初始化
+    virtual ~ngx_connection_s() = default;
+    
+
+    void GetOneToUse(int sockfd); // 分配出去的时候初始化
     void PutOneToFree(); //回收回来的时候做一些事
     std::shared_ptr<HttpContext> getContext(); // 获取HttpContext，用来解析http请求报文
 
-    int fd; // 套接字句柄
-    lpngx_listening_t listening; // 如果这个连接分配给了一个监听套接字，这里就指向监听套接字对应的lpngx_listening_t内存首地址
+// socket相关
+    int fd{-1}; // 套接字句柄
+    lpngx_listening_t listening; // 所属监听
 
-    uint64_t iCurrsequence; 
+
+    std::atomic<int> iCurrsequence{0};// 包的序号
     sockaddr s_sockaddr; // 保存对方地址信息
 
-    // 和读有关
-    ngx_event_handler_pt rhandler; // 读事件处理方法
-    ngx_event_handler_pt whandler; // 写事件处理方法
+// epoll相关
+    // 读写回调函数
+    ngx_event_handler rhandler;
+    ngx_event_handler whandler;
+    // epoll唤醒的事件类型
+    uint32_t events{0};
 
-    // epoll相关
-    uint32_t events;
-
-    // 收包相关
-    unsigned char curStat; // 当前收包状态
-    char dataHeadInfo[_DATA_BUFSIZE_]; // 保存收到的包头数据
-    char *precvbuf; //接收数据的缓冲区
-    unsigned int irecvlen; // 收到多少数据由这个变量指定
-    char *precvMemPointer; // new出来的用于收包的内存首地址，释放用的
-
-    std::mutex logicPorcMutex;
-
-    // 发包相关
-    std::atomic<int> iThrowsendCount; //iThrowsendCount的作用，用来标记
-    char *psendMemPointer; // 发送完成后释放【消息头 + 包头 + 包体】
-    char *psendbuf; // 发送数据缓冲区头指针，【包头+包体】
-    unsigned int isendlen; // 要发送多少数据
-
-    // 回收相关
+// 回收相关
     time_t inRecyTime; 
-    // 心跳包
+
+ // 心跳包
     time_t lastPingTime;
-    // 网络安全
-    uint64_t FloodKickLastTime; // 上次受到攻击的时间
-    int FloodAttackCount; // 受到攻击的次数
-    std::atomic<int> iSendCount; //发送队列中的条目数
 
-    lpngx_connection_t next;
+// 网络安全
+    uint64_t FloodKickLastTime{0}; // 上次受到攻击的时间
+    int FloodAttackCount{0}; // 受到攻击的次数
+    std::atomic<int> iSendCount{0}; //发送队列中的条目数
 
-    // http相关
-    std::atomic_bool ishttp;
+
+// http相关
+    std::atomic_bool ishttp{false};
     std::shared_ptr<HttpContext> context_;
+
+
+
+// 删除拷贝操作，允许移动操作
+    ngx_connection_s(const ngx_connection_s&) = delete;
+    ngx_connection_s& operator=(const ngx_connection_s&) = delete;
+    ngx_connection_s(ngx_connection_s&&) = default;
+    ngx_connection_s& operator=(ngx_connection_s&&) = default;
+
 };
 
-// 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
+
+
+
+
+
+
+
+
+// // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
 typedef struct _STRUC_MSG_HEADER
 {
-    lpngx_connection_t pConn; // 记录对应的链接，注意这是个指针
+    std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
     uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
     //......其他以后扩展
 } STRUC_MSG_HEADER, *LPSTRUC_MSG_HEADER;
+
+
+
+
+
+
+
+
+
 
 
 //socket
@@ -197,13 +292,13 @@ private:
     int m_epollhandle; // epoll返回的句柄
 
     //连接池相关
-    std::list<lpngx_connection_t> m_connectionList; // 连接列表【连接池】
-    std::list<lpngx_connection_t> m_freeConnectionList; // 空闲连接列表【装的全是空闲连接】
+    std::vector<lpngx_connection_t> m_connectionList; // 连接列表【连接池】
+    std::deque<lpngx_connection_t> m_freeConnectionList; // 空闲连接列表【装的全是空闲连接】
     std::atomic<int> m_total_connection_n; // 连接池总数量
     std::atomic<int> m_free_connection_n; // 空闲连接数量
     std::mutex m_connectionListMutex; // 连接池互斥锁
     std::mutex m_recyconnqueueMutex; // 回收连接队列互斥锁
-    std::list<lpngx_connection_t> m_recyconnectionList; // 回收连接队列
+    std::vector<lpngx_connection_t> m_recyconnectionList; // 回收连接队列
     std::atomic<int> m_total_recyconnection_n;// 待回收连接队列大小
     int m_RecyConnectionWaitTime; // 等待一段时间才回收连接【慢回收？】
 
@@ -213,6 +308,7 @@ private:
     // 消息队列
     std::list<char*> m_MsgSendQueue; // 发送数据消息队列
     std::atomic<int> m_iSendMsgQueueCount; // 发送消息队列大小
+
     // 多线程相关
     std::vector<std::shared_ptr<ThreadItem>> m_threadVector; // 线程列表
     std::mutex m_sendMessageQueueMutex; // 发送消息队列互斥锁

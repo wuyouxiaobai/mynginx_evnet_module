@@ -201,7 +201,7 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
     //设置一下变量
     ngx_process = NGX_PROCESS_WORKER;  //设置进程的类型，是worker进程
     
-    // 重新为子进程设置进程名，不要与父进程重复
+// 初始化线程池、发送线程、回收线程、超时踢人线程、epoll
     ngx_worker_process_init(inum);
 
     ngx_setproctitle(pprocname); //设置进程名
