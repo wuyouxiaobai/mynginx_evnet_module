@@ -30,11 +30,13 @@ namespace WYXB
 // typedef void (CSocket::*ngx_event_handler_pt)(lpngx_connection_t c); // 定义成员函数指针
 
 class CSocket;
+struct STRUC_MSG_HEADER;
 struct ngx_listening_s;
 struct ngx_connection_s;
 
 using lpngx_listening_t = std::shared_ptr<ngx_listening_s>;
 using lpngx_connection_t = std::shared_ptr<ngx_connection_s>;
+using LPSTRUC_MSG_HEADER = std::shared_ptr<STRUC_MSG_HEADER>;
 using ngx_event_handler = std::function<void(lpngx_connection_t)>;
 
 
@@ -180,7 +182,7 @@ typedef struct _STRUC_MSG_HEADER
     std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
     uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
     //......其他以后扩展
-} STRUC_MSG_HEADER, *LPSTRUC_MSG_HEADER;
+} STRUC_MSG_HEADER;
 
 
 

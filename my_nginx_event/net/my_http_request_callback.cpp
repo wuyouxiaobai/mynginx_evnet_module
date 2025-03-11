@@ -12,171 +12,141 @@ namespace WYXB
 
 
 
-
 // http请求报文到来时的回调
 void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
 {
-    char tempBuf[4096];
-    ssize_t n = recv(pConn->fd, tempBuf, sizeof(tempBuf), 0);
-    if (n > 0) {
-        pConn->context.append(tempBuf, n);
-        while (c->context.parseRequest()) { // 循环解析完整请求
-            handle_complete_request(c->context.getRequest());
-            c->context.reset(); // 重置状态处理下一个请求
+    auto logConnectionError = [pConn](int errcode, const char* msg) {
+        char ip[INET6_ADDRSTRLEN] = "unknown"; // 扩展支持IPv6
+        uint16_t port = 0;
+    
+        if (pConn->s_sockaddr.sa_family == AF_INET) {
+            auto* addr4 = reinterpret_cast<sockaddr_in*>(&pConn->s_sockaddr);
+            inet_ntop(AF_INET, &addr4->sin_addr, ip, INET_ADDRSTRLEN);
+            port = ntohs(addr4->sin_port);
+        } else if (pConn->s_sockaddr.sa_family == AF_INET6) {
+            auto* addr6 = reinterpret_cast<sockaddr_in6*>(&pConn->s_sockaddr);
+            inet_ntop(AF_INET6, &addr6->sin6_addr, ip, INET6_ADDRSTRLEN);
+            port = ntohs(addr6->sin6_port);
         }
-    } else if (n == 0) {
-        // 连接关闭
-        break;
-    } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        break; // 数据已读完
-    } else {
-        // 处理错误
-        break;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// //接收数据
-//     bool isflood = false; // 是否是flood攻击
-//     ngx_log_stderr(errno,"ngx_http_read_request_handler before recvproc" );
-
-//     // char pMsgBuf[2024];
-//     // 收包
-//     ssize_t reco = recvproc(pConn, pConn->precvbuf, 2024);
-//     if(reco <= 0)
-//     {
-//         return;
-//     }
-
-
-
-// // 解析http请求
-//     try
-//     {
-//         // HttpContext对象用于解析出buf中的请求报文，并把报文的关键信息封装到HttpRequest对象中
-//         std::chrono::system_clock::time_point receiveTime = std::chrono::system_clock::now();
-//         std::shared_ptr<HttpContext> context = pConn->getContext();
-//         if (!context->parseRequest(pConn->precvbuf, receiveTime)) // 解析一个http请求
-//         {
-//             // 如果解析http报文过程中出错
-//             conn->send("HTTP/1.1 400 Bad Request\r\n\r\n");
-//             conn->shutdown();
-//         }
-
-//         // 如果buf缓冲区中解析出一个完整的数据包才封装响应报文
-//         if (context->gotAll())
-//         {
-//             onRequest(conn, context->request());
-//             context->reset();
-//         }
-//     }
-//     catch (const std::exception &e)
-//     {
-//         // 捕获异常，返回错误信息
-//         LOG_ERROR << "Exception in onMessage: " << e.what();
-//         conn->send("HTTP/1.1 400 Bad Request\r\n\r\n");
-//         conn->shutdown();
-//     }   
-
-
-
-//     //收到数据
-//     auto params = m_httpGetProcessor->parseRequestLine(pConn->precvbuf);
-//     std::string tmpstr = m_httpGetProcessor->buildHtmlResponse(params);
-
-
-//     //合法包头，继续处理
-//     //分配内存开始接受
-//     CMemory memory = CMemory::getInstance();
-//     char* pTmpBuffer = (char*)memory.AllocMemory(m_iLenMsgHeader + tmpstr.size() + 1, false);
-
-//     // a）先填写消息头内容
-//     LPSTRUC_MSG_HEADER ptmpMsgHeader = (LPSTRUC_MSG_HEADER)pTmpBuffer;
-//     pConn->ishttp = true;
-//     ptmpMsgHeader->pConn = pConn;
-//     ptmpMsgHeader->iCurrsequence = pConn->iCurrsequence; //收到包时连接池中连接序号记录到消息头中，将来备用
-//     // b） 填写包头内容
-//     pTmpBuffer += m_iLenMsgHeader; //跳过消息头
-//     memcpy(pTmpBuffer, tmpstr.c_str(), tmpstr.size());// 将数据拷贝进来
-
-//     // 加入发送队列
-//     g_threadpool.inMsgRecvQueueAndSignal(pTmpBuffer);
-
-}
     
-    
+        ngx_log_stderr(errcode, "%s [%s]:%d (family:%d)", 
+                      msg, ip, port, pConn->s_sockaddr.sa_family);
+    };
 
-void HttpServer::onRequest(const muduo::net::TcpConnectionPtr &conn, const HttpRequest &req)
-{
-    const std::string &connection = req.getHeader("Connection");
-    bool close = ((connection == "close") ||
-                  (req.getVersion() == "HTTP/1.0" && connection != "Keep-Alive"));
-    HttpResponse response(close);
-    
-    // 处理OPTIONS请求
-    if (req.method() == HttpRequest::kOptions)
-    {
-        response.setStatusLine(req.getVersion(), HttpResponse::k200Ok, "OK");
-        response.addHeader("Access-Control-Allow-Origin", "*");
-        response.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        response.addHeader("Access-Control-Allow-Headers", "Content-Type");
-        response.addHeader("Access-Control-Max-Age", "86400");
+    // 创建消息缓冲区（头部+最大数据空间）
+    std::vector<uint8_t> buffer(sizeof(STRUC_MSG_HEADER) + 4096);
 
-        muduo::net::Buffer buf;
-        response.appendToBuffer(&buf);
-        conn->send(&buf);
+    // 在缓冲区头部构造消息头（使用placement new）
+    auto* header = new (buffer.data()) STRUC_MSG_HEADER{
+        .pConn = pConn,
+        .iCurrsequence = pConn->iCurrsequence
+    };
+
+    // 接收网络数据
+    const ssize_t n = recv(
+        pConn->fd,
+        reinterpret_cast<char*>(buffer.data()) + sizeof(STRUC_MSG_HEADER),
+        4096,
+        0
+    );
+
+    // 处理接收结果
+    if (n > 0) {
+        buffer.resize(sizeof(STRUC_MSG_HEADER) + n);
+        g_threadpool.inMsgRecvQueueAndSignal(std::move(buffer));
         return;
     }
 
-    // 根据请求报文信息来封装响应报文对象
-    httpCallback_(req, &response); // 执行onHttpCallback函数
-
-    // 可以给response设置一个成员，判断是否请求的是文件，如果是文件设置为true，并且存在文件位置在这里send出去。
-    muduo::net::Buffer buf;
-    response.appendToBuffer(&buf);
-
-    conn->send(&buf);
-
-    // 如果是短连接的话，返回响应报文后就断开连接
-    if (response.closeConnection())
-    {
-        conn->shutdown();
+    // 处理错误情况
+    const int lastError = errno;  // 立即保存errno值
+    switch(n) {
+    case 0:  // 客户端主动关闭连接
+        logConnectionError(lastError, "Connection closed by client");
+        zdClosesocketProc(pConn);
+        break;
+        
+    case -1: // 处理系统调用错误
+        switch(lastError) {
+        case EAGAIN:
+#if (EAGAIN != EWOULDBLOCK)
+        case EWOULDBLOCK: // 合并 EAGAIN 和 EWOULDBLOCK
+#endif
+            logConnectionError(lastError, "Resource temporarily unavailable");
+            break;
+            
+        case EINTR:
+            logConnectionError(lastError, "Interrupted by signal");
+            break;
+            
+        default:  // 不可恢复错误
+            logConnectionError(lastError, "Fatal socket error");
+            zdClosesocketProc(pConn);
+        }
+        break;
     }
 }
 
-// 执行请求对应的路由处理函数
-void HttpServer::onHttpCallback(const HttpRequest &req, HttpResponse *resp)
-{
-    if (!router_.route(req, resp))
-    {
-        std::cout << "请求的啥，url：" << req.method() << " " << req.path() << std::endl;
-        std::cout << "未找到路由，返回404" << std::endl;
-        resp->setStatusCode(HttpResponse::k404NotFound);
-        resp->setStatusMessage("Not Found");
-        resp->setCloseConnection(true);
-    }
-}
+// void HttpServer::onRequest(const muduo::net::TcpConnectionPtr &conn, const HttpRequest &req)
+// {
+//     const std::string &connection = req.getHeader("Connection");
+//     bool close = ((connection == "close") ||
+//                   (req.getVersion() == "HTTP/1.0" && connection != "Keep-Alive"));
+//     HttpResponse response(close);
+    
+//     // 处理OPTIONS请求
+//     if (req.method() == HttpRequest::kOptions)
+//     {
+//         response.setStatusLine(req.getVersion(), HttpResponse::k200Ok, "OK");
+//         response.addHeader("Access-Control-Allow-Origin", "*");
+//         response.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+//         response.addHeader("Access-Control-Allow-Headers", "Content-Type");
+//         response.addHeader("Access-Control-Max-Age", "86400");
+
+//         muduo::net::Buffer buf;
+//         response.appendToBuffer(&buf);
+//         conn->send(&buf);
+//         return;
+//     }
+
+//     // 根据请求报文信息来封装响应报文对象
+//     httpCallback_(req, &response); // 执行onHttpCallback函数
+
+//     // 可以给response设置一个成员，判断是否请求的是文件，如果是文件设置为true，并且存在文件位置在这里send出去。
+//     muduo::net::Buffer buf;
+//     response.appendToBuffer(&buf);
+
+//     conn->send(&buf);
+
+//     // 如果是短连接的话，返回响应报文后就断开连接
+//     if (response.closeConnection())
+//     {
+//         conn->shutdown();
+//     }
+// }
+
+// // 执行请求对应的路由处理函数
+// void HttpServer::onHttpCallback(const HttpRequest &req, HttpResponse *resp)
+// {
+//     if (!router_.route(req, resp))
+//     {
+//         std::cout << "请求的啥，url：" << req.method() << " " << req.path() << std::endl;
+//         std::cout << "未找到路由，返回404" << std::endl;
+//         resp->setStatusCode(HttpResponse::k404NotFound);
+//         resp->setStatusMessage("Not Found");
+//         resp->setCloseConnection(true);
+//     }
+// }
 
 // http响应未发送完时继续发送的回调
 void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
 {
+
+
+todo...............
+
+
+
+
 
 
 
@@ -222,8 +192,4 @@ void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
     // pConn->psendbuf = NULL; // 重置指针
 }
 
-
 }
-
-
-

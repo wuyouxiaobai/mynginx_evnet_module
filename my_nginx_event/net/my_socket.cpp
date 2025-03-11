@@ -399,10 +399,10 @@ void CSocket::zdClosesocketProc(lpngx_connection_t p_Conn)
         close(p_Conn->fd); //关闭socket后，epoll就会被从红黑树中删除，之后就无法收到任何epoll事件
         p_Conn->fd = -1; // 标记该连接已经关闭
     }
-    if(p_Conn->iThrowsendCount > 0)
-    {
-        --p_Conn->iThrowsendCount; 
-    }
+    // if(p_Conn->iThrowsendCount > 0)
+    // {
+    //     --p_Conn->iThrowsendCount; 
+    // }
     inRecyConnectQueue(p_Conn); // 加入待回收连接队列
     return;
 }

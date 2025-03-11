@@ -118,8 +118,8 @@ void CSocket::ngx_event_accept(lpngx_connection_t oldc)// 建立连接
         newc->listening = oldc->listening; // 连接对象和监听对象关联，方便通过连接对象找监听对象【关联到监听端口】
         
         ngx_log_stderr(0,"ngx_event_accept bind ......");
-        newc->rhandler = &CSocket::ngx_read_request_handler; // 设置读事件处理函数
-        newc->whandler = &CSocket::ngx_write_response_handler; // 设置写事件处理函数
+        newc->rhandler = std::bind(&CSocket::ngx_read_request_handler, this, std::placeholders::_1);; // 设置读事件处理函数
+        newc->whandler = std::bind(&CSocket::ngx_write_response_handler, this, std::placeholders::_1); // 设置写事件处理函数
 
         // 客户端应该主动发送第一次数据，对读事件加入epoll监听，当客户端发送数据时，会触发读事件，读事件处理函数ngx_read_request_handler会被调用
         if(ngx_epoll_oper_event(sockfd, EPOLL_CTL_ADD, EPOLLIN, 0 ,newc) == -1)

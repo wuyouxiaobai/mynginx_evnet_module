@@ -458,11 +458,11 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
 
 void CSocket::ngx_close_connection(lpngx_connection_t p_Conn)
 {
-    // if(p_Conn->fd != -1)
-    // {
-    //     close(p_Conn->fd); // 关闭fd
-    //     p_Conn->fd = -1; // 标记fd为-1，表示连接已经关闭
-    // }
+    if(p_Conn->fd != -1)
+    {
+        close(p_Conn->fd); // 关闭fd
+        p_Conn->fd = -1; // 标记fd为-1，表示连接已经关闭
+    }
     ngx_free_connection(p_Conn); // 释放连接资源
 }
 
