@@ -216,7 +216,7 @@ public:
     int ngx_epoll_oper_event(int fd, uint32_t eventtype, uint32_t flag, int bcaction, ngx_connection_s* pConn); // epoll操作
 
 protected:
-    void msgSend(char* psendbuf); // 把数据放到待发送队列
+    void msgSend(std::string psendbuf); // 把数据放到待发送队列
     void zdClosesocketProc(lpngx_connection_t pConn); // 主动关闭一个连接要做的善后的处理函数
 
 private:

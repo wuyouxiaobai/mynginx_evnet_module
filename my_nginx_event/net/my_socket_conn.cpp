@@ -87,8 +87,8 @@ void ngx_connection_s::PutOneToFree()
 
     // HTTP 协议标识重置
     ishttp = false;  // 设置HTTP状态
-
-    context_.reset();
+    context_->reset();
+    context_ = nullptr;
    
 // 可选：内存缓冲区清理
     //    if (precvMemPointer) {          // 接收缓冲区清理

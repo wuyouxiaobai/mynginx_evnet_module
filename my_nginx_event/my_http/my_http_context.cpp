@@ -6,11 +6,11 @@ namespace WYXB
 {
 
 // 将报文解析出来将关键信息封装到HttpRequest对象里面去
-bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_point receiveTime)
+bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system_clock::time_point receiveTime)
 {
     buffer_.append(buf);
     bool ok = true;
-
+    isErr = false;
     while (parsed_pos_ < buffer_.size()) {
         switch(state_) {
             case kExpectRequestLine: {
@@ -18,6 +18,7 @@ bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_
                 if (crlf != std::string::npos) {
                     // 请求行长度超过1KB视为攻击尝试
                     if (crlf - parsed_pos_ > 1024) { 
+                        isErr = true;
                         ok = false;
                         break;
                     }
@@ -32,6 +33,7 @@ bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_
                     }
                     
                 } else if (buffer_.size() - parsed_pos_ > 1024) {
+                    isErr = true;
                     ok = false; // 异常长请求行防御
                 }
                 break;
@@ -50,6 +52,7 @@ bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_
                             request_.method() == HttpRequest::kPut) {
                             auto contentLen = request_.getHeader("Content-Length");
                             if (contentLen.empty()) {
+                                isErr = true;
                                 ok = false; // POST/PUT必须包含Content-Length[3](@ref)
                             } else if (!contentLen.empty()) {
                                 try {
@@ -57,6 +60,7 @@ bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_
                                     state_ = (request_.contentLength() > 0) ? 
                                             kExpectBody : kGotAll;
                                 } catch (...) {
+                                    isErr = true;
                                     ok = false; // 非法Content-Length格式
                                 }
                             }
@@ -80,6 +84,7 @@ bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_
                             );
                         
                     } else {
+                        isErr = true;
                         ok = false; // 非法Header格式
                     }
                     parsed_pos_ = crlf + 2;
@@ -104,6 +109,13 @@ bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_
         
         if (!ok || (state_ != kGotAll && parsed_pos_ >= buffer_.size())) 
             break;
+    }
+
+    // 如果解析失败，重置状态
+    if (isErr && !ok) {
+        state_ = kExpectRequestLine; // 重置状态到初始状态
+        buffer_.clear();             // 清空缓冲区
+        parsed_pos_ = 0;             // 重置解析位置
     }
 
     // 滑动窗口优化（内存安全防御）

@@ -352,7 +352,7 @@ void CSocket::ngx_close_listening_sockets()
 }
 
 // 将一个待发送消息写入发送队列中
-void CSocket::msgSend(char* psendbuf)
+void CSocket::msgSend(std::string psendbuf)
 {
     CMemory memory = CMemory::getInstance();
     std::lock_guard<std::mutex> lock(m_sendMessageQueueMutex);

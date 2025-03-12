@@ -23,7 +23,7 @@ public:
     : state_(kExpectRequestLine)
     {}
 
-    bool parseRequest(std::string buf, std::chrono::system_clock::time_point receiveTime);
+    bool parseRequest(std::string buf, bool& isErr, std::chrono::system_clock::time_point receiveTime);
     bool gotAll() const 
     { return state_ == kGotAll;  }
 

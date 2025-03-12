@@ -33,6 +33,10 @@ private:
     bool regist();
 
 private:
+    void onRequest(lpngx_connection_t conn, const HttpRequest &req);
+    void handleRequest(const HttpRequest &req, HttpResponse *resp);
+
+private:
     // 通用收发数据相关函数
     void SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t iMsgCode);
     // 心跳包时间到，检测心跳包是否超时
