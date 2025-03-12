@@ -92,7 +92,7 @@ void CLogicSocket::threadRecvProFunc(std::vector<uint8_t>&& pMsgBuf)
         {
             if(!isErr) return; // 解析过程没有出错，直接返回
 
-            msgSend("HTTP/1.1 400 Bad Request\r\n\r\n"); // 返回错误响应
+            msgSend("HTTP/1.1 400 Bad Request\r\n\r\n", headptr); // 返回错误响应
             return;
 
         }
@@ -198,12 +198,8 @@ void CLogicSocket::onRequest(lpngx_connection_t conn, const HttpRequest &req)
     // 打印完整的响应内容用于调试
     // LOG_INFO << "Sending response:\n" << buf.toStringPiece().as_string();
 
-    msgSend(buf);
-    // 如果是短连接的话，返回响应报文后就断开连接
-    if (response.closeConnection())
-    {
-        zdClosesocketProc(conn);
-    }
+    msgSend(buf, conn);
+
 }
 
 // 执行请求对应的路由处理函数

@@ -216,7 +216,7 @@ public:
     int ngx_epoll_oper_event(int fd, uint32_t eventtype, uint32_t flag, int bcaction, ngx_connection_s* pConn); // epoll操作
 
 protected:
-    void msgSend(std::string psendbuf); // 把数据放到待发送队列
+    void msgSend(std::string psendbuf, lpngx_connection_t pConn); // 把数据放到待发送队列
     void zdClosesocketProc(lpngx_connection_t pConn); // 主动关闭一个连接要做的善后的处理函数
 
 private:
@@ -309,7 +309,7 @@ private:
     struct epoll_event m_events[NGX_MAX_EVENTS]; // epoll_wait中接受返回的所发生的事件
 
     // 消息队列
-    std::list<char*> m_MsgSendQueue; // 发送数据消息队列
+    std::list<std::shared_ptr<std::vector<char>>> m_MsgSendQueue; // 发送数据消息队列
     std::atomic<int> m_iSendMsgQueueCount; // 发送消息队列大小
 
     // 多线程相关

@@ -326,15 +326,18 @@ void CSocket::Shotdown_subproc()
 //清理Tcp发送队列
 void CSocket::clearMsgSendQueue()
 {
-   	char * sTmpMempoint;
-	CMemory p_memory = CMemory::getInstance();
+    m_MsgSendQueue.clear();
+
+	// char * sTmpMempoint;
+	// CMemory p_memory = CMemory::getInstance();
 	
-	while(!m_MsgSendQueue.empty())
-	{
-		sTmpMempoint = m_MsgSendQueue.front();
-		m_MsgSendQueue.pop_front(); 
-		p_memory.FreeMemory(sTmpMempoint);
-	}	 
+	// while(!m_MsgSendQueue.empty())
+	// {
+	// 	sTmpMempoint = m_MsgSendQueue.front();
+	// 	m_MsgSendQueue.pop_front(); 
+	// 	p_memory.FreeMemory(sTmpMempoint);
+	// }	 
+
 }
 
 // 关闭Socket
@@ -352,43 +355,87 @@ void CSocket::ngx_close_listening_sockets()
 }
 
 // 将一个待发送消息写入发送队列中
-void CSocket::msgSend(std::string psendbuf)
+void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 {
-    CMemory memory = CMemory::getInstance();
     std::lock_guard<std::mutex> lock(m_sendMessageQueueMutex);
     
-    // 发送消息队列过大可能给服务器带来风险
-    if(m_MsgSendQueue.size() > 50000)
-    {
-        //发送队列过大，比如客户端恶意不接受数据，就会导致这个队列越来越大
-        //那么可以考虑为了服务器安全，干掉一些数据的发送，虽然有可能导致客户端出现问题，但总比服务器不稳定要好很多
-        m_iDiscardSendPkgCount++;
-        memory.FreeMemory(psendbuf);
+    if (m_MsgSendQueue.size() > 50000) {
+        ++m_iDiscardSendPkgCount;
+        // 可以记录日志，提示队列已满并丢弃了消息
+        ngx_log_stderr(0, "CSocket::msgSend() 发送队列已满，丢弃了一条消息.");
         return;
     }
-    // 总体数据并无风险，不会导致服务器崩溃，看个体数据，找到恶意者
-    LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)psendbuf;
-    lpngx_connection_t p_Conn = pMsgHeader->pConn;
-    if(p_Conn->iSendCount > 400)
-    {
-        // 该用户收消息太慢【或者干脆不收】，该用户累积的发送队列中数据条目过大，认为是恶意用户
-        ngx_log_stderr(0,"CSocket::msgSend()中发现某用户%d积压了大量待发送数据包，切断与他的连接！",p_Conn->fd);   
-        m_iDiscardSendPkgCount++;
-        memory.FreeMemory(psendbuf);
-        zdClosesocketProc(p_Conn); //直接关闭
+
+    // 检查发送计数
+    if (pConn->iSendCount > 400) {
+        ngx_log_stderr(0, "CSocket::msgSend()中发现某用户%d积压了大量待发送数据包，切断与他的连接！", pConn->fd);   
+        ++m_iDiscardSendPkgCount;
+
+        // 关闭连接
+        zdClosesocketProc(pConn);
         return;
     }
-    
-    ++p_Conn->iSendCount; // 发送队列中的连接累积发送条目数
-    m_MsgSendQueue.push_back(psendbuf); // 加入发送队列
-    ++m_iSendMsgQueueCount; // 发送队列中总条目数+1
-    
-    // 将信号量+1，通知发送线程有数据要发送
-    if(sem_post(&m_semEventSendQueue) == -1)// 让ServerSendQueueThread()流程走下来干活
-    {
-        ngx_log_stderr(0,"CSocket::msgSend()中sem_post(&m_semEventSendQueue)失败.");
+
+    // 增加发送计数
+    ++pConn->iSendCount;
+
+    // 创建消息头
+    STRUC_MSG_HEADER msgHeader;
+    msgHeader.pConn = pConn;
+    msgHeader.iCurrsequence = pConn->iCurrsequence;
+
+    // 拼接消息头和消息体
+    size_t totalSize = sizeof(STRUC_MSG_HEADER) + psendbuf.size();
+    auto msgPtr = std::make_shared<std::vector<char>>(totalSize);
+    std::memcpy(msgPtr->data(), &msgHeader, sizeof(STRUC_MSG_HEADER));
+    std::memcpy(msgPtr->data() + sizeof(STRUC_MSG_HEADER), psendbuf.data(), psendbuf.size());
+
+    // 加入发送队列
+    m_MsgSendQueue.emplace_back(msgPtr);
+    ++m_iSendMsgQueueCount;
+
+    // 发送信号量通知发送线程
+    if (sem_post(&m_semEventSendQueue) == -1) {
+        ngx_log_stderr(0, "CSocket::msgSend()中sem_post(&m_semEventSendQueue)失败: %s", std::strerror(errno));
     }
-    return;
+
+
+
+    // CMemory memory = CMemory::getInstance();
+    // std::lock_guard<std::mutex> lock(m_sendMessageQueueMutex);
+    
+    // // 发送消息队列过大可能给服务器带来风险
+    // if(m_MsgSendQueue.size() > 50000)
+    // {
+    //     //发送队列过大，比如客户端恶意不接受数据，就会导致这个队列越来越大
+    //     //那么可以考虑为了服务器安全，干掉一些数据的发送，虽然有可能导致客户端出现问题，但总比服务器不稳定要好很多
+    //     m_iDiscardSendPkgCount++;
+    //     memory.FreeMemory(psendbuf);
+    //     return;
+    // }
+    // // 总体数据并无风险，不会导致服务器崩溃，看个体数据，找到恶意者
+    // LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)psendbuf;
+    // lpngx_connection_t p_Conn = pMsgHeader->pConn;
+    // if(p_Conn->iSendCount > 400)
+    // {
+    //     // 该用户收消息太慢【或者干脆不收】，该用户累积的发送队列中数据条目过大，认为是恶意用户
+    //     ngx_log_stderr(0,"CSocket::msgSend()中发现某用户%d积压了大量待发送数据包，切断与他的连接！",p_Conn->fd);   
+    //     m_iDiscardSendPkgCount++;
+    //     memory.FreeMemory(psendbuf);
+    //     zdClosesocketProc(p_Conn); //直接关闭
+    //     return;
+    // }
+    
+    // ++p_Conn->iSendCount; // 发送队列中的连接累积发送条目数
+    // m_MsgSendQueue.push_back(psendbuf); // 加入发送队列
+    // ++m_iSendMsgQueueCount; // 发送队列中总条目数+1
+    
+    // // 将信号量+1，通知发送线程有数据要发送
+    // if(sem_post(&m_semEventSendQueue) == -1)// 让ServerSendQueueThread()流程走下来干活
+    // {
+    //     ngx_log_stderr(0,"CSocket::msgSend()中sem_post(&m_semEventSendQueue)失败.");
+    // }
+    // return;
 }
 
 // 主动发送一个连接时要做到善后操作
@@ -672,7 +719,7 @@ int CSocket::ngx_epoll_process_events(int timer)
             {
                 // --pConn->iThrowsendCount; // 连接断开
                 ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，连接断开.");
-                // zdClosesocketProc(pConn);
+                zdClosesocketProc(pConn);
             }
             else
             {
@@ -695,6 +742,8 @@ int CSocket::ngx_epoll_process_events(int timer)
 // 处理发送消息队列的线程
 void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数据的线程
 {
+
+根据响应体，决定是否关闭连接zdClosesocketProc
     ngx_log_stderr(errno,"ServerSendQueueThread");
     auto pThreadItem = static_cast<ThreadItem*>(threadData);
     if(pThreadItem->_pThis.lock() == nullptr)
