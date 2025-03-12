@@ -44,18 +44,29 @@ bool CLogicSocket::Initialize()
     //做一些和本类相关的初始化工作
     //....日后根据需要扩展        
     bool bParentInit = CSocket::Initialize();  //调用父类的同名函数
-    InitHandler();
-    registerHandle();
+    InitRouter();
     return bParentInit;
 }
 
+// 根据需求注册对应业务函数
+bool CLogicSocket::regist()
+{
+    // 示例：注册动态路径心跳
+    m_Router->addRegexCallback(
+    HttpRequest::Method::kGet, 
+    "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
+    [](const HttpRequest& req, HttpResponse* resp) {
+        resp->setStatusCode(HttpResponse::HttpStatusCode::k200Ok);
+        resp->setBody("Dynamic PONG");
+    }
+);
+}
 
 
 //处理接收消息队列中的消息，由线程池调用
-void CLogicSocket::threadRecvProFunc(char* pMsgBuf)
+void CLogicSocket::threadRecvProFunc(std::vector<uint8_t>&& pMsgBuf)
 {
     LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)(pMsgBuf); // 消息头
-    LPCOMM_PKG_HEADER pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgBuf + m_iLenMsgHeader); // 包头
     void* pPkgBody; // 指向包体的指针
     uint16_t pkglen = ntohs(pPkgHeader->pkgLen); // 客户端指明的包宽度
 
@@ -152,11 +163,6 @@ void CLogicSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t cur
 
 
 
-// 注册函数
-void CLogicSocket::RegisterHandle(uint16_t msgCode, HandlerFunc handler) {
-    std::lock_guard<std::mutex> lock(m_handlerMutex);
-    m_handlerMap[msgCode] = handler;
-}
 
 
 

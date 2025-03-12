@@ -49,11 +49,12 @@ CSocket::CSocket()
 CSocket::~CSocket()
 {
     // 监听端口相关内存释放
-    std::vector<lpngx_listening_t>::iterator pos;
-    for(pos = m_ListenSocketList.begin(); pos !=m_ListenSocketList.end(); pos++)
-    {
-        delete(*pos);
-    }
+    // std::vector<lpngx_listening_t>::iterator pos;
+    // for(pos = m_ListenSocketList.begin(); pos !=m_ListenSocketList.end(); pos++)
+    // {
+    //     delete(*pos);
+    // }
+    ngx_close_listening_sockets();
     m_ListenSocketList.clear();
     
 }
@@ -65,10 +66,10 @@ bool CSocket::Initialize()
 {
     ReadConf();
     // m_httpGetProcessor = std::make_shared<HttpGetProcessor>();
-    if(ngx_open_listening_sockets() == false)
-    {
-        return false;
-    }
+    // if(ngx_open_listening_sockets() == false)
+    // {
+    //     return false;
+    // }
     return true;
 }
 
@@ -94,12 +95,12 @@ void CSocket::ReadConf()
 
 // 监听端口【支持多个端口】，与nginx命名一样
 // 在创建worker进程之前就创建好
-bool CSocket::ngx_open_listening_sockets()
+lpngx_listening_t CSocket::ngx_open_listening_sockets()
 {
     int isock; // socket
     struct sockaddr_in serv_addr; // 服务器地址
     int iport; // 端口号
-    char strinfo[100]; // 临时字符串
+    // char strinfo[100]; // 临时字符串
     
     // 初始化相关
     memset(&serv_addr, 0, sizeof(serv_addr)); // 先初始一下
@@ -107,76 +108,78 @@ bool CSocket::ngx_open_listening_sockets()
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);// 监听本地所有ip地址
     
     // 中途用的配置信息
-    MyConf* config = MyConf::getInstance();
-    for(int i = 0; i < m_ListenPortCount; i++) // 监听多个端口
+    // MyConf* config = MyConf::getInstance();
+    // int WorkerProcesses = config->GetIntDefault("WorkerProcesses", 1);
+    // for(int i = 0; i < WorkerProcesses; i++) // 创建多个套接字，监听同一个端口
+    // {
+    isock = socket(AF_INET, SOCK_STREAM, 0); // 创建socket
+    if(isock == -1)
     {
-        isock = socket(AF_INET, SOCK_STREAM, 0); // 创建socket
-        if(isock == -1)
-        {
-            ngx_log_stderr(errno, "CSocket::Initialize()中socket()失败,i=%d.",i);
-            return false;
-        }
-
-        int reuseaddr = 1; 
-        if(setsockopt(isock,SOL_SOCKET,SO_REUSEADDR,(const void*)&reuseaddr, sizeof(reuseaddr)) == -1)
-        {
-            ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEADDR)失败;i=%d.",i);
-            return false;
-        }
-
-        //为处理惊群问题使用reuseport
-        int reuseport = 1;
-        if(setsockopt(isock, SOL_SOCKET, SO_REUSEADDR,(const void*)&reuseport, sizeof(int))==-1)
-        {
-            ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEPORT)失败;i=%d.",i);
-        }
-
-
-        //设置为非阻塞
-        if(setnonblocking(isock) == false)
-        {
-            ngx_log_stderr(errno,"CSocket::Initialize()中setnonblocking()失败;i=%d.",i);
-            close(isock);
-            return false;
-        
-        }
-
-        // 设置本服务器要监听的地址和端口，这样客户端连接
-        strinfo[0] = 0;
-        sprintf(strinfo, "ListenPort%d", i);
-        iport = config->GetIntDefault(strinfo, 10000); // 取得端口号
-        serv_addr.sin_port = htons((in_port_t)iport);
-
-        //绑定服务器地址结构
-        if(bind(isock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1)
-        {
-            ngx_log_stderr(errno,"CSocket::Initialize()中bind()失败;i=%d.",i);
-            close(isock);
-            return false;
-        }
-
-        // 监听端口
-        if(listen(isock, NGX_LISTEN_BACKLOG) == -1)
-        {
-            ngx_log_stderr(errno,"CSocket::Initialize()中listen()失败;i=%d.",i);
-            close(isock);
-            return false;
-        }
-
-        // 可以，放在列表中
-        lpngx_listening_t p_listensocketitem = new ngx_listening_s;
-        memset(p_listensocketitem, 0, sizeof(ngx_listening_s));
-        p_listensocketitem->port = iport;
-        p_listensocketitem->fd = isock;
-        ngx_log_error_core(NGX_LOG_INFO, 0, "监听端口%d成功",iport);
-        m_ListenSocketList.push_back(p_listensocketitem);
-
-
-
+        ngx_log_stderr(errno, "CSocket::Initialize()中socket()失败.");
+        return nullptr;
     }
-    if(m_ListenSocketList.size() <= 0)
-        return false;
-    return true;
+
+    int reuseaddr = 1; 
+    if(setsockopt(isock,SOL_SOCKET,SO_REUSEADDR,(const void*)&reuseaddr, sizeof(reuseaddr)) == -1)
+    {
+        ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEADDR)失败.");
+        return nullptr;
+    }
+
+    //为处理惊群问题使用reuseport
+    int reuseport = 1;
+    if(setsockopt(isock, SOL_SOCKET, SO_REUSEPORT,(const void*)&reuseport, sizeof(int))==-1)
+    {
+        ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEPORT)失败.");
+    }
+
+
+    //设置为非阻塞
+    if(setnonblocking(isock) == false)
+    {
+        ngx_log_stderr(errno,"CSocket::Initialize()中setnonblocking()失败.");
+        close(isock);
+        return nullptr;
+    
+    }
+
+    // 设置本服务器要监听的地址和端口，这样客户端连接
+    // strinfo[0] = 0;
+    // sprintf(strinfo, "ListenPort%d", 0);
+    MyConf* config = MyConf::getInstance();
+    iport = config->GetIntDefault("ListenPort", 10000); // 取得端口号
+    serv_addr.sin_port = htons((in_port_t)iport);
+
+    //绑定服务器地址结构
+    if(bind(isock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1)
+    {
+        ngx_log_stderr(errno,"CSocket::Initialize()中bind()失败.");
+        close(isock);
+        return nullptr;
+    }
+
+    // 监听端口
+    if(listen(isock, NGX_LISTEN_BACKLOG) == -1)
+    {
+        ngx_log_stderr(errno,"CSocket::Initialize()中listen()失败.");
+        close(isock);
+        return nullptr;
+    }
+
+    // 可以，放在列表中
+    lpngx_listening_t  p_listensocketitem = std::make_shared<ngx_listening_s>();
+    // memset(p_listensocketitem, 0, sizeof(ngx_listening_s));
+    p_listensocketitem->port = iport;
+    p_listensocketitem->fd = isock;
+    ngx_log_error_core(NGX_LOG_INFO, 0, "监听端口%d成功",iport);
+    m_ListenSocketList.push_back(p_listensocketitem);
+
+
+
+    // }
+    // if(m_ListenSocketList.size() <= 0)
+    //     return false;
+    return p_listensocketitem;
 
 }
 
@@ -337,7 +340,9 @@ void CSocket::clearMsgSendQueue()
 // 关闭Socket
 void CSocket::ngx_close_listening_sockets()
 {
-    for(int i = 0; i < m_ListenPortCount; i++) //要关闭这么多个监听端口
+    MyConf* config = MyConf::getInstance();
+    int WorkerProcesses = config->GetIntDefault("WorkerProcesses", 1);
+    for(int i = 0; i < m_ListenPortCount; i++) //关闭多个套接字
     {  
         //ngx_log_stderr(0,"端口是%d,socketid是%d.",m_ListenSocketList[i]->port,m_ListenSocketList[i]->fd);
         close(m_ListenSocketList[i]->fd);
@@ -496,36 +501,40 @@ int CSocket::ngx_epoll_init()// epoll初始化
     initconnection();
 
     // 遍历所有监听socket【监听端口】，为每一个socket分配一个连接池中的连接
-    std::vector<lpngx_listening_t>::iterator iter;
-    for(iter = m_ListenSocketList.begin(); iter != m_ListenSocketList.end(); iter++)
+    // std::vector<lpngx_listening_t>::iterator iter;
+
+
+    lpngx_listening_t listening = ngx_open_listening_sockets();
+
+    // for(iter = m_ListenSocketList.begin(); iter != m_ListenSocketList.end(); iter++)
+    // {
+    lpngx_connection_t pConn = ngx_get_connection(listening->fd); // 从连接池中取出一个空闲连接
+    if(pConn == NULL)
     {
-        lpngx_connection_t pConn = ngx_get_connection((*iter)->fd); // 从连接池中取出一个空闲连接
-        if(pConn == NULL)
-        {
-            //分配连接失败，致命问题了，直接退出吧
-            ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中ngx_get_connection()分配连接失败.");
-            exit(2);
-        }
-        pConn->listening = (*iter);
-        (*iter)->connection = pConn;
-
-        // 对监听端口的读事件设置处理方法
-        pConn->rhandler = &CSocket::ngx_event_accept;
-
-        // 往监听socket上增加监听事件，从而开始监听端口履行其职责
-        // 将监听socket上红黑树
-        if(ngx_epoll_oper_event(
-                                (*iter)->fd,         //socekt句柄
-                                EPOLL_CTL_ADD,      //事件类型，这里是增加
-                                EPOLLIN|EPOLLRDHUP, //标志，这里代表要增加的标志,EPOLLIN：可读，EPOLLRDHUP：TCP连接的远端关闭或者半关闭
-                                0,                  //对于事件类型为增加的，不需要这个参数
-                                pConn              //连接池中的连接 
-                                ) == -1)
-        {
-            exit(2); //致命问题，退出吧
-        }
-    
+        //分配连接失败，致命问题了，直接退出吧
+        ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中ngx_get_connection()分配连接失败.");
+        exit(2);
     }
+    pConn->listening = listening;
+    // (*iter)->connection = pConn;
+
+    // 对监听端口的读事件设置处理方法
+    pConn->rhandler = std::bind(&CSocket::ngx_event_accept, this, std::placeholders::_1); ;
+
+    // 往监听socket上增加监听事件，从而开始监听端口履行其职责
+    // 将监听socket上红黑树
+    if(ngx_epoll_oper_event(
+                            listening->fd,         //socekt句柄
+                            EPOLL_CTL_ADD,      //事件类型，这里是增加
+                            EPOLLIN|EPOLLRDHUP, //标志，这里代表要增加的标志,EPOLLIN：可读，EPOLLRDHUP：TCP连接的远端关闭或者半关闭
+                            0,                  //对于事件类型为增加的，不需要这个参数
+                            pConn.get()              //连接池中的连接 
+                            ) == -1)
+    {
+        exit(2); //致命问题，退出吧
+    }
+    
+    // }
     return 1;
 }
 
@@ -535,7 +544,7 @@ int CSocket::ngx_epoll_oper_event(int fd,               //句柄，一个socket
                         uint32_t eventtype,        //事件类型，一般是EPOLL_CTL_ADD，EPOLL_CTL_MOD，EPOLL_CTL_DEL ，说白了就是操作epoll红黑树的节点(增加，修改，删除)
                         uint32_t flag,             //标志，具体含义取决于eventtype
                         int bcaction,         //补充动作，用于补充flag标记的不足  :  0：增加   1：去掉 2：完全覆盖 ,eventtype是EPOLL_CTL_MOD时这个参数就有用
-                        lpngx_connection_t pConn             //pConn：一个指针【其实是一个连接】，EPOLL_CTL_ADD时增加到红黑树中去，将来epoll_wait时能取出来用)// epoll操作
+                        ngx_connection_s* pConn             //pConn：一个指针【其实是一个连接】，EPOLL_CTL_ADD时增加到红黑树中去，将来epoll_wait时能取出来用)// epoll操作
                         )
 {
     struct epoll_event ev;
@@ -631,7 +640,8 @@ int CSocket::ngx_epoll_process_events(int timer)
     uint32_t revents;
     for(int i = 0; i < events; i++) //遍历本次epoll_wait返回的所有事件，events才是返回的实际事件数量
     {
-        pConn = (lpngx_connection_t)m_events[i].data.ptr;
+        auto Connptr = static_cast<ngx_connection_s*>(m_events[i].data.ptr);
+        lpngx_connection_t pConn = Connptr->shared_from_this();
 
         //事件没有过期
         revents = m_events[i].events;
@@ -649,7 +659,7 @@ int CSocket::ngx_epoll_process_events(int timer)
             else
             {
                 ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件.");
-                (this->* (pConn->rhandler) )(pConn);  
+                pConn->rhandler(pConn); 
             }
 
         }
@@ -660,14 +670,14 @@ int CSocket::ngx_epoll_process_events(int timer)
             ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生.");
             if(revents & (EPOLLHUP|EPOLLERR|EPOLLRDHUP)) // 连接断开事件
             {
-                --pConn->iThrowsendCount; // 连接断开
+                // --pConn->iThrowsendCount; // 连接断开
                 ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，连接断开.");
                 // zdClosesocketProc(pConn);
             }
             else
             {
                 ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，正常写事件.");
-                (this->* (pConn->whandler) )(pConn); //如果有数据没有发送完毕，由系统驱动来发送，则这里执行的应该是 CSocekt::ngx_write_request_handler()
+                pConn->whandler(pConn); //如果有数据没有发送完毕，由系统驱动来发送
             }
         }
 

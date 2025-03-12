@@ -105,19 +105,8 @@ void HttpRequest::setQueryParameters(const char *start, const char *end)
     }
 }
 
-void HttpRequest::addHeader(const char *start, const char *colon, const char *end)
+void HttpRequest::addHeader(std::string key, std::string value)
 {
-    std::string key(start, colon);
-    ++colon;
-    while (colon < end && isspace(*colon))
-    {
-        ++colon;
-    }
-    std::string value(colon, end);
-    while (!value.empty() && isspace(value[value.size() - 1])) // 消除尾部空格
-    {
-        value.resize(value.size() - 1);
-    }
     headers_[key] = value;
 }
 
@@ -143,4 +132,4 @@ void HttpRequest::swap(HttpRequest &that)
     std::swap(receiveTime_, that.receiveTime_);
 }
 
-} // namespace http
+}

@@ -118,7 +118,8 @@ struct ngx_listening_s {
 //     std::shared_ptr<HttpContext> context_;
 // };
 // 网络连接结构体现代化改造
-struct ngx_connection_s {
+struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s> 
+{
     ngx_connection_s();
     virtual ~ngx_connection_s() = default;
     
@@ -212,7 +213,7 @@ public:
 public:
     int ngx_epoll_init();// epoll初始化
     int ngx_epoll_process_events(int timer);// epoll等待或者处理事件
-    int ngx_epoll_oper_event(int fd, uint32_t eventtype, uint32_t flag, int bcaction, lpngx_connection_t pConn); // epoll操作
+    int ngx_epoll_oper_event(int fd, uint32_t eventtype, uint32_t flag, int bcaction, ngx_connection_s* pConn); // epoll操作
 
 protected:
     void msgSend(char* psendbuf); // 把数据放到待发送队列
@@ -220,7 +221,7 @@ protected:
 
 private:
     void ReadConf(); // 读取配置文件
-    bool ngx_open_listening_sockets(); // 打开监听端口【支持多端口】
+    lpngx_listening_t ngx_open_listening_sockets(); // 打开监听端口【支持多端口】
     void ngx_close_listening_sockets(); // 关闭监听端口
     bool setnonblocking(int sockfd); // 设置非阻塞
     

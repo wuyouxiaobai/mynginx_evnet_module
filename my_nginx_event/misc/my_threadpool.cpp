@@ -194,8 +194,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
         
         try {
             if (!buf.empty()) {
-                char* data = reinterpret_cast<char*>(buf.data());
-                g_socket.threadRecvProFunc(data);
+                g_socket.threadRecvProFunc(std::move(buf));
             }
         } catch(...) {
             // 异常处理

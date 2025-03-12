@@ -1,5 +1,6 @@
 #include "my_http/my_http_context.h"
 #include <algorithm>
+#include <cstring>
 
 namespace WYXB
 {
@@ -7,111 +8,113 @@ namespace WYXB
 // 将报文解析出来将关键信息封装到HttpRequest对象里面去
 bool HttpContext::parseRequest(std::string buf, std::chrono::system_clock::time_point receiveTime)
 {
-    bool ok = true; // 解析每行请求格式是否正确
-    bool hasMore = true;
-    size_t pos = 0; // 用于记录当前解析的位置
-    while (hasMore)
-    {
-        if (state_ == kExpectRequestLine)
-        {
-            size_t crlf = buf.find("\r\n", pos); // 查找CRLF
-            if (crlf != std::string::npos)
-            {
-                ok = processRequestLine(buf.data() + pos, buf.data() + crlf);
-                if (ok)
-                {
-                    request_.setReceiveTime(receiveTime);
-                    pos = crlf + 2; // 移动到下一行
-                    state_ = kExpectHeaders;
-                }
-                else
-                {
-                    hasMore = false;
-                }
-            }
-            else
-            {
-                hasMore = false;
-            }
-        }
-        else if (state_ == kExpectHeaders)
-        {
-            size_t crlf = buf.find("\r\n", pos);
-            if (crlf != std::string::npos)
-            {
-                const char *colon = std::find(buf.data() + pos, buf.data() + crlf, ':');
-                if (colon < buf.data() + crlf)
-                {
-                    request_.addHeader(buf.data() + pos, colon, buf.data() + crlf);
-                }
-                else if (buf.data() + pos == buf.data() + crlf)
-                { 
-                    // 空行，结束Header
-                    // 根据请求方法和Content-Length判断是否需要继续读取body
-                    if (request_.method() == HttpRequest::kPost || 
-                        request_.method() == HttpRequest::kPut)
-                    {
-                        std::string contentLength = request_.getHeader("Content-Length");
-                        if (!contentLength.empty())
-                        {
-                            request_.setContentLength(std::stoi(contentLength));
-                            if (request_.contentLength() > 0)
-                            {
-                                state_ = kExpectBody;
-                            }
-                            else
-                            {
-                                state_ = kGotAll;
-                                hasMore = false;
-                            }
-                        }
-                        else
-                        {
-                            // POST/PUT 请求没有 Content-Length，是HTTP语法错误
-                            ok = false;
-                            hasMore = false;
-                        }
+    buffer_.append(buf);
+    bool ok = true;
+
+    while (parsed_pos_ < buffer_.size()) {
+        switch(state_) {
+            case kExpectRequestLine: {
+                size_t crlf = buffer_.find("\r\n", parsed_pos_);
+                if (crlf != std::string::npos) {
+                    // 请求行长度超过1KB视为攻击尝试
+                    if (crlf - parsed_pos_ > 1024) { 
+                        ok = false;
+                        break;
                     }
-                    else
-                    {
-                        // GET/HEAD/DELETE 等方法直接完成（没有请求体）
-                        state_ = kGotAll; 
-                        hasMore = false;
+                    
+                    
+                    ok = processRequestLine(buffer_.data()+parsed_pos_, 
+                                            buffer_.data()+crlf);
+                    if (ok) {
+                        request_.setReceiveTime(receiveTime);
+                        parsed_pos_ = crlf + 2;
+                        state_ = kExpectHeaders;
                     }
+                    
+                } else if (buffer_.size() - parsed_pos_ > 1024) {
+                    ok = false; // 异常长请求行防御
                 }
-                else
-                {
-                    ok = false; // Header行格式错误
-                    hasMore = false;
+                break;
+            }
+            
+            case kExpectHeaders: {
+                while(parsed_pos_ < buffer_.size()) {
+                    size_t crlf = buffer_.find("\r\n", parsed_pos_);
+                    if (crlf == std::string::npos) break;
+
+                    // 空行检测
+                    if (crlf == parsed_pos_) {
+                        parsed_pos_ += 2;
+
+                        if (request_.method() == HttpRequest::kPost || 
+                            request_.method() == HttpRequest::kPut) {
+                            auto contentLen = request_.getHeader("Content-Length");
+                            if (contentLen.empty()) {
+                                ok = false; // POST/PUT必须包含Content-Length[3](@ref)
+                            } else if (!contentLen.empty()) {
+                                try {
+                                    request_.setContentLength(std::stoi(contentLen));
+                                    state_ = (request_.contentLength() > 0) ? 
+                                            kExpectBody : kGotAll;
+                                } catch (...) {
+                                    ok = false; // 非法Content-Length格式
+                                }
+                            }
+                        } else {
+                            state_ = kGotAll;
+                        }
+
+                        break;
+                    }
+
+                    // 解析Header键值对
+                    const char* colon = static_cast<const char*>(
+                        memchr(buffer_.data()+parsed_pos_, ':', crlf - parsed_pos_));
+                    if (colon) {
+                        //Header解析
+                            std::string key(buffer_.data()+parsed_pos_, colon);
+                            std::string val(colon+1, buffer_.data()+crlf);
+                            request_.addHeader(
+                                std::move(key.erase(key.find_last_not_of(" \t")+1)),
+                                std::move(val.erase(0, val.find_first_not_of(" \t")))
+                            );
+                        
+                    } else {
+                        ok = false; // 非法Header格式
+                    }
+                    parsed_pos_ = crlf + 2;
                 }
-                pos = crlf + 2; // 移动到下一行
+                break;
             }
-            else
-            {
-                hasMore = false;
+            
+            case kExpectBody: {
+                size_t remaining = buffer_.size() - parsed_pos_;
+                if (remaining >= request_.contentLength()) {
+                    request_.setBody(buffer_.substr(
+                        parsed_pos_, request_.contentLength()));
+                    parsed_pos_ += request_.contentLength();
+                    state_ = kGotAll;
+                }
+                break;
             }
-        }
-        else if (state_ == kExpectBody)
-        {
-            // 检查缓冲区中是否有足够的数据
-            if (buf.size() - pos < request_.contentLength())
-            {
-                hasMore = false; // 数据不完整，等待更多数据
+            
+            case kGotAll:
                 return true;
-            }
-
-            // 只读取 Content-Length 指定的长度
-            std::string body(buf.data() + pos, buf.data() + pos + request_.contentLength());
-            request_.setBody(body);
-
-            // 准确移动读指针
-            pos += request_.contentLength();
-
-            state_ = kGotAll;
-            hasMore = false;
         }
+        
+        if (!ok || (state_ != kGotAll && parsed_pos_ >= buffer_.size())) 
+            break;
     }
-    return ok; // ok为false代表报文语法解析错误
+
+    // 滑动窗口优化（内存安全防御）
+    if (parsed_pos_ > 4096) {
+        buffer_ = buffer_.substr(parsed_pos_);
+        parsed_pos_ = 0;
+    } else if (parsed_pos_ > 0) {
+        buffer_.erase(0, parsed_pos_);
+        parsed_pos_ = 0;
+    }
+    return ok;
 }
 
 // 解析请求行

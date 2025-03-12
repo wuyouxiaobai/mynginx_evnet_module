@@ -47,7 +47,7 @@ public:
         return version_;
     }
     
-    void addHeader(const char* start, const char* colon, const char* end);
+    void addHeader(std::string key, std::string value);
     std::string getHeader(const std::string& field) const;
 
     const std::map<std::string, std::string>& headers() const

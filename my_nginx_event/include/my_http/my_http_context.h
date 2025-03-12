@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <chrono> // 添加 chrono 用于时间戳
-
+#include "my_buffer.h"
 #include "my_http/my_http_request.h"
 
 namespace WYXB
@@ -48,13 +48,10 @@ private:
 
 private:
     std::string buffer_;       // 持久化接收缓冲区
-    size_t parsedPos_ = 0;     // 已解析位置
+    size_t parsed_pos_ = 0;     // 已解析位置
 
 public:
-    void append(char* buf, ssize_t n)
-    {
-        buffer_.append(buf, n);
-    }
+
 
 };
 
