@@ -14,7 +14,7 @@
 #include <memory>
 #include "my_http_context.h"
 #include <functional>
-
+#include "Buffer.h"
 
 
 
@@ -157,8 +157,8 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
 
 // http相关
     std::atomic_bool ishttp{false};
-    std::shared_ptr<HttpContext> context_;
-
+    std::shared_ptr<HttpContext> context_; // 解析并暂存的http请求报文
+    Buffer psendbuf;
 
 
 // 删除拷贝操作，允许移动操作
@@ -240,7 +240,7 @@ private:
 
     void clearMsgSendQueue(); // 处理发送消息队列
 protected:
-    ssize_t sendproc(lpngx_connection_t c, char* buff, ssize_t size);// 将数据发送到客户端
+    ssize_t sendproc(lpngx_connection_t c, Buffer buff);// 将数据发送到客户端
 private:
     // 获得对端信息相关
     size_t ngx_sock_ntop(struct sockaddr *sa, int port, u_char *text, size_t len); // 根据参数1获得对端信息，获得地址端口字符串，返回这个字符串长度

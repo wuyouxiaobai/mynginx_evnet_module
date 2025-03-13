@@ -1,26 +1,26 @@
-#pragma once
+// #pragma once
 
-namespace WYXB
-{
+// namespace WYXB
+// {
 
-class CMemory
-{
+// class CMemory
+// {
 
-private:
-	CMemory(){}  
+// private:
+// 	CMemory(){}  
 
-public:
-	~CMemory(){}
+// public:
+// 	~CMemory(){}
 
 
-public:
-    static CMemory& getInstance()
-    {
-        static CMemory instance;
-        return instance;
-    }
-	void *AllocMemory(int memCount,bool ifmemset);
-	void FreeMemory(void *point);
+// public:
+//     static CMemory& getInstance()
+//     {
+//         static CMemory instance;
+//         return instance;
+//     }
+// 	void *AllocMemory(int memCount,bool ifmemset);
+// 	void FreeMemory(void *point);
 
-};
-}
+// };
+// }

@@ -744,6 +744,8 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
 {
 
 根据响应体，决定是否关闭连接zdClosesocketProc
+
+优化一下代码，将sendmsg提出
     ngx_log_stderr(errno,"ServerSendQueueThread");
     auto pThreadItem = static_cast<ThreadItem*>(threadData);
     if(pThreadItem->_pThis.lock() == nullptr)
@@ -752,16 +754,16 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
     }
     std::shared_ptr<CSocket> pSocket = pThreadItem->_pThis.lock();
     int err;
-    std::list<char*>::iterator pos,pos2,posend;
+    std::list<std::shared_ptr<std::vector<char>>>::iterator pos,pos2,posend;
 
-    char* pMsgbuf;
+    std::shared_ptr<std::vector<char>> pMsgbuf;
     LPSTRUC_MSG_HEADER pMsgHeader;
     LPCOMM_PKG_HEADER pPkgHeader;
     lpngx_connection_t p_Conn;
     uint16_t itmp;
     ssize_t sendsize;
 
-    CMemory memory = CMemory::getInstance();
+    // CMemory memory = CMemory::getInstance();
 
     while(g_stopEvent == 0) // 线程不退出
     {
@@ -791,31 +793,43 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
             while(pos!= posend)
             {
                 pMsgbuf = *pos; // 拿到的消息
-                pMsgHeader = (LPSTRUC_MSG_HEADER)pMsgbuf; // 指向消息头
+                // 提取头部
+                STRUC_MSG_HEADER header;
+                std::memcpy(&header, pMsgbuf->data(), sizeof(STRUC_MSG_HEADER));
+
+                // 提取数据体
+                size_t headerSize = sizeof(STRUC_MSG_HEADER);
+                size_t dataSize = pMsgbuf->size() - headerSize;
 
                 // 判断是http消息还是tcp连接的消息
-                if(pMsgHeader->pConn->ishttp)
+                lpngx_connection_t headptr =  header.pConn.lock();
+                if (!headptr) {
+                    ngx_log_stderr(0, "无效的连接指针");
+                    continue;  // 或其他错误处理
+                }
+                if(headptr->ishttp)
                 {
   
-                    p_Conn = pMsgHeader->pConn; // 指向连接
+                    p_Conn = headptr; // 指向连接
 
-                    if(p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
+                    if(p_Conn->iCurrsequence != headptr->iCurrsequence)
                     {
                         // 包序号错误，丢弃该包
                         pos2 = pos;
                         pos++;
                         pSocket->m_MsgSendQueue.erase(pos2);
                         --pSocket->m_iSendMsgQueueCount;
-                        memory.FreeMemory(pMsgbuf);
+                        // memory.FreeMemory(pMsgbuf);
                         continue;
                     }
     
-                    if(p_Conn->iThrowsendCount > 0)
-                    {
-                        pos++;
-                        continue;
-                    }
-    
+                    // if(p_Conn->iThrowsendCount > 0)
+                    // {
+                    //     pos++;
+                    //     continue;
+                    // }
+                    size_t dataSize = pMsgbuf->size() - headerSize;
+                    std::string dataBody(pMsgbuf->data() + headerSize, dataSize);
                     --p_Conn->iSendCount; // 发送计数减1
     
                     //可以发送消息了，一些必要的信息记录，要发送的东西也要从发送队列干掉
@@ -823,49 +837,48 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                     pos++;
                     pSocket->m_MsgSendQueue.erase(pos2);
                     --pSocket->m_iSendMsgQueueCount; // 发送队列计数减1
-                    p_Conn->psendbuf = (char*)(pMsgbuf + pSocket->m_iLenMsgHeader); // 要发送数据的缓冲区指针
-                    p_Conn->isendlen = sizeof(pMsgbuf) - pSocket->m_iLenMsgHeader; // 要发送的数据长度
-                    sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); // 发送数据
+                    p_Conn->psendbuf.append(dataBody.c_str(), dataBody.size());
+                    sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf); // 发送数据
 
                 }
 
-                else
-                {
-                    pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgbuf + pSocket->m_iLenMsgHeader); // 指向包头
-                    p_Conn = pMsgHeader->pConn; // 指向连接
+                // else
+                // {
+                //     pPkgHeader = (LPCOMM_PKG_HEADER)(pMsgbuf + pSocket->m_iLenMsgHeader); // 指向包头
+                //     p_Conn = pMsgHeader->pConn; // 指向连接
     
-                    if(p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
-                    {
-                        // 包序号错误，丢弃该包
-                        pos2 = pos;
-                        pos++;
-                        pSocket->m_MsgSendQueue.erase(pos2);
-                        --pSocket->m_iSendMsgQueueCount;
-                        memory.FreeMemory(pMsgbuf);
-                        continue;
-                    }
+                //     if(p_Conn->iCurrsequence != pMsgHeader->iCurrsequence)
+                //     {
+                //         // 包序号错误，丢弃该包
+                //         pos2 = pos;
+                //         pos++;
+                //         pSocket->m_MsgSendQueue.erase(pos2);
+                //         --pSocket->m_iSendMsgQueueCount;
+                //         memory.FreeMemory(pMsgbuf);
+                //         continue;
+                //     }
     
-                    if(p_Conn->iThrowsendCount > 0)
-                    {
-                        pos++;
-                        continue;
-                    }
+                //     if(p_Conn->iThrowsendCount > 0)
+                //     {
+                //         pos++;
+                //         continue;
+                //     }
     
-                    --p_Conn->iSendCount; // 发送计数减1
+                //     --p_Conn->iSendCount; // 发送计数减1
     
-                    //可以发送消息了，一些必要的信息记录，要发送的东西也要从发送队列干掉
-                    p_Conn->psendMemPointer = pMsgbuf; //用来释放内存
-                    pos2 = pos;
-                    pos++;
-                    pSocket->m_MsgSendQueue.erase(pos2);
-                    --pSocket->m_iSendMsgQueueCount; // 发送队列计数减1
-                    p_Conn->psendbuf = (char*)pPkgHeader; // 要发送数据的缓冲区指针
-                    itmp = ntohs(pPkgHeader->pkgLen); // 包长度【包头+包体】
-                    p_Conn->isendlen = itmp; // 要发送的数据长度
+                //     //可以发送消息了，一些必要的信息记录，要发送的东西也要从发送队列干掉
+                //     p_Conn->psendMemPointer = pMsgbuf; //用来释放内存
+                //     pos2 = pos;
+                //     pos++;
+                //     pSocket->m_MsgSendQueue.erase(pos2);
+                //     --pSocket->m_iSendMsgQueueCount; // 发送队列计数减1
+                //     p_Conn->psendbuf = (char*)pPkgHeader; // 要发送数据的缓冲区指针
+                //     itmp = ntohs(pPkgHeader->pkgLen); // 包长度【包头+包体】
+                //     p_Conn->isendlen = itmp; // 要发送的数据长度
     
-                    sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); // 发送数据
+                //     sendsize = pSocket->sendproc(p_Conn, p_Conn->psendbuf, p_Conn->isendlen); // 发送数据
     
-                }
+                // }
 
 
  
@@ -874,28 +887,32 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
 
                 if(sendsize > 0)
                 {
-                    if(sendsize == p_Conn->isendlen) // 全部发送
+                    if(sendsize == p_Conn->psendbuf.readableBytes()) // 全部发送
                     {
                         // 发送成功，释放内存
-                        memory.FreeMemory(pMsgbuf);
-                        p_Conn->psendMemPointer = NULL; // 释放标志
-                        p_Conn->iThrowsendCount = 0; 
+                        p_Conn->psendbuf.retrieveAll();
+
+                        // memory.FreeMemory(pMsgbuf);
+                        // p_Conn->psendMemPointer = NULL; // 释放标志
+                        // p_Conn->iThrowsendCount = 0; 
+
                         
                     }
                     else // 没有完全发送【发送缓冲区满了】
                     {
                         // 记录发送了多少数据，下次sendproc时继续
-                        p_Conn->psendbuf = p_Conn->psendbuf + sendsize;
-                        p_Conn->isendlen = p_Conn->isendlen - sendsize;
+                        p_Conn->psendbuf.retrieve(sendsize);
+                        // p_Conn->psendbuf = p_Conn->psendbuf + sendsize;
+                        // p_Conn->isendlen = p_Conn->isendlen - sendsize;
                         // 发送缓冲区满了，需要依赖系统通知来发送数据
-                        ++p_Conn->iThrowsendCount; //ThrowsendCount用来标记连接还有未发送的数据注册到epoll上，保证后序在将所有数据都发送后才能释放Conn
+                        // ++p_Conn->iThrowsendCount; //ThrowsendCount用来标记连接还有未发送的数据注册到epoll上，保证后序在将所有数据都发送后才能释放Conn
                         // 依赖ngx_write_request_handler()来发送数据，这里不做处理，等待系统通知
                         if(pSocket->ngx_epoll_oper_event(
                                 p_Conn->fd,         //socket句柄
                                 EPOLL_CTL_MOD,      //事件类型，这里是增加【因为我们准备增加个写通知】
                                 EPOLLOUT,           //标志，这里代表要增加的标志,EPOLLOUT：可写【可写的时候通知我】
                                 0,                  //对于事件类型为增加的，EPOLL_CTL_MOD需要这个参数, 0：增加   1：去掉 2：完全覆盖
-                                p_Conn              //连接池中的连接
+                                p_Conn.get()              //连接池中的连接
                                 ) == -1)
                         {
                             ngx_log_stderr(errno,"CSocekt::ServerSendQueueThread()ngx_epoll_oper_event()失败.");
@@ -907,22 +924,23 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                 // 出现问题了
                 else if(sendsize == 0)
                 {
-                    memory.FreeMemory(p_Conn->psendMemPointer);  //释放内存
-                    p_Conn->psendMemPointer = NULL;
-                    p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的    
+                    // memory.FreeMemory(p_Conn->psendMemPointer);  //释放内存
+                    // p_Conn->psendMemPointer = NULL;
+                    // p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的    
+                    p_Conn->psendbuf.retrieveAll();
                     continue;
                 }
                 else if(sendsize == -1)
                 {
                     // 发送缓冲区满了，一个也没有发送出去，需要依赖系统通知来发送数据
-                    ++p_Conn->iThrowsendCount; // 标记发送缓冲区满了。需要通过epoll事件驱动消息来继续发送
+                    // ++p_Conn->iThrowsendCount; // 标记发送缓冲区满了。需要通过epoll事件驱动消息来继续发送
                     // 依赖ngx_write_request_handler()来发送数据，这里不做处理，等待系统通知
                     if(pSocket->ngx_epoll_oper_event(
                             p_Conn->fd,         //socket句柄
                             EPOLL_CTL_MOD,      //事件类型，这里是增加【因为我们准备增加个写通知】
                             EPOLLOUT,           //标志，这里代表要增加的标志,EPOLLOUT：可写【可写的时候通知我】
                             0,                  //对于事件类型为增加的，EPOLL_CTL_MOD需要这个参数, 0：增加   1：去掉 2：完全覆盖
-                            p_Conn              //连接池中的连接
+                            p_Conn.get()              //连接池中的连接
                             ) == -1)
                     {
                         ngx_log_stderr(errno,"CSocekt::ServerSendQueueThread()ngx_epoll_oper_event()失败.");
@@ -932,9 +950,10 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                 else
                 {
                     // 返回值应该是-2，一般认为对端断开，等待recv来断开socket以及回收资源
-                    memory.FreeMemory(p_Conn->psendMemPointer);  //释放内存
-                    p_Conn->psendMemPointer = NULL;
-                    p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的    
+                    // memory.FreeMemory(p_Conn->psendMemPointer);  //释放内存
+                    // p_Conn->psendMemPointer = NULL;
+                    // p_Conn->iThrowsendCount = 0;  //这行其实可以没有，因此此时此刻这东西就是=0的    
+                    p_Conn->psendbuf.retrieveAll();
                     continue;
                 }
                 

@@ -85,8 +85,8 @@ int main(int argc, char*const *argv)
         exitcode = 2; //标记找不到文件
         goto lblexit;
     }
-    WYXB::CMemory::getInstance();
-    WYXB::CRC32::getInstance();
+    // WYXB::CMemory::getInstance();
+    // WYXB::CRC32::getInstance();
     WYXB::ngx_log_init();             //日志初始化(创建/打开日志文件)，这个需要配置项，所以必须放配置文件载入的后边；     
     
     if(WYXB::ngx_init_signals() != 0) //信号初始化

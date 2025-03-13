@@ -223,12 +223,12 @@ void CSocket::ngx_wait_request_handler_proc_plast(lpngx_connection_t pConn, bool
 
 // 发送数据专用函数，返回发送的字节数
 // 返回=0，对方中断； 返回=-1，errno == EAGAIN，对方缓冲区满了；返回-2，errno ！= EAGAIN ！= EWOULDBLOCK ！= EINTR，也认为对端断开
-ssize_t CSocket::sendproc(lpngx_connection_t c, char* buff, ssize_t size)// 将数据发送到客户端
+ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送到客户端
 {
     ssize_t n;
     for(;;)
     {
-        n = send(c->fd, buff, size, 0);
+        n = send(c->fd, buff.peek(), buff.readableBytes(), 0);
         if(n > 0) // 发送成功
         {
             return n;

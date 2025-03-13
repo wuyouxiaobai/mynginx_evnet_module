@@ -8,12 +8,12 @@
 namespace WYXB
 {
 
-// 网络库底层缓冲区类
+// 底层缓冲区类
 class Buffer
 {
 public:
     static const size_t kCheapPrepend = 8;  // 预留空间大小
-    static const size_t kInitialSize = 4096;  // 初始缓冲区大小
+    static const size_t kInitialSize = 1024;  // 初始缓冲区大小
 
     explicit Buffer(size_t initialSize = kInitialSize)
         : buffer_(initialSize + kCheapPrepend),
@@ -59,7 +59,7 @@ public:
         readerIndex_ = writerIndex_ = kCheapPrepend;
     }
 
-  
+    // 将onMessage（）函数上报的Buffer数据，转成string数据返回
     std::string retrieveAllAsString()
     {
         return retrieveAsString(readableBytes());
