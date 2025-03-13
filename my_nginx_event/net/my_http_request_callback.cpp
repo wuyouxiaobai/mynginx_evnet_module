@@ -142,9 +142,82 @@ void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
 {
 
 
-todo...............
+// todo...............
 
+    auto pMsgbuf = pConn->psendbuf;
+    STRUC_MSG_HEADER header;
+    std::memcpy(&header, pMsgbuf.peek(), sizeof(STRUC_MSG_HEADER));
+    lpngx_connection_t pConn;
 
+    // 消息头验证
+    // 确保连接有效性和数据完整性检查
+    if (!pConn || pConn->fd == -1 || pConn->psendbuf.readableBytes() == 0 || pConn->iCurrsequence != header.iCurrsequence) {
+        ngx_log_stderr(0, "非法连接或空发送缓冲区");
+        return;
+    }
+
+    // 消息处理核心逻辑
+    const size_t headerSize = sizeof(STRUC_MSG_HEADER);
+    std::string payload_str(
+        pMsgbuf.peek() + headerSize, 
+        pMsgbuf.readableBytes() - headerSize
+    ); 
+    
+    // 发送处理
+    Buffer tmpbuf;
+    tmpbuf.append(payload_str.c_str(), payload_str.size());
+    pConn->psendbuf.retrieveAll();
+    // 循环发送直到缓冲区空或出现EAGAIN
+    while (true) {
+        // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
+        ssize_t sendsize = sendproc(pConn, tmpbuf);
+        // ssize_t sendsize = sendproc(pConn, pConn->psendbuf);
+
+        if (sendsize > 0) {
+            tmpbuf.retrieve(sendsize);
+            // 检查是否发送完成
+            if (pConn->psendbuf.readableBytes() == 0) 
+            {
+                // 发送成功，从哪个epoll中干掉；
+                if(ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD, EPOLLOUT, 1, pConn.get()) == -1) // 覆盖epoll中的写事件
+                {
+                    //有这情况发生？这可比较麻烦，不过先do nothing
+                    ngx_log_stderr(errno,"CSocekt::ngx_write_request_handler()中ngx_epoll_oper_event()失败。");
+                }
+                break;
+            }
+        } 
+        else if (sendsize == -1) 
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) 
+            {
+                STRUC_MSG_HEADER newHeader{
+                    .iCurrsequence = pConn->iCurrsequence,
+                    .pConn = pConn
+                };
+                pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
+                pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
+                // 注册可写事件继续发送
+                ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD,
+                                EPOLLOUT, 0, pConn.get());
+                ngx_log_stderr(0, "发送缓冲区满，等待再次发送 fd=%d", pConn->fd);
+            } 
+            else 
+            {
+                // 严重错误立即关闭
+                ngx_log_stderr(errno, "发送失败，关闭连接 fd=%d", pConn->fd);
+                zdClosesocketProc(pConn);
+            }
+            break;
+        }
+        else 
+        {
+            // 其他错误（如返回0）
+            ngx_log_stderr(0, "未知发送错误，关闭连接 fd=%d", pConn->fd);
+            zdClosesocketProc(pConn);
+            break;
+        }
+    }
 
 
 

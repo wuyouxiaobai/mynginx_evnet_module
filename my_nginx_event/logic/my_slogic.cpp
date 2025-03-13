@@ -83,10 +83,10 @@ void CLogicSocket::threadRecvProFunc(std::vector<uint8_t>&& pMsgBuf)
         std::string dataBody(pMsgBuf.begin() + headerSize, pMsgBuf.end());
         bool isErr = false; // 判断是否解析失败
         lpngx_connection_t headptr =  header.pConn.lock();
-        if(!headptr) // 连接已经断开
+        if(!headptr || headptr->iCurrsequence != header.iCurrsequence) // 连接已经断开
         {
             return;
-        }
+        }    
         bool ok = headptr->context_->parseRequest(dataBody, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
         if(!ok) // 未完成解析
         {
