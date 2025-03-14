@@ -12,29 +12,61 @@ namespace WYXB
 // 设置踢出时钟（向multimap中增加内容），用户三次握手成功接入，开启踢人模式【Sock_WaitTimeEnable = 1】，那么本函数被调用
 void CSocket::AddToTimmerQueue(lpngx_connection_t pConn)
 { // 设置踢出时钟（向map中增加内容）
-    CMemory memory = CMemory::getInstance();
 
-    time_t currTime = time(nullptr); // 获取当前时间
-    currTime += m_iWaitTime; // 计算下次踢出时间，需要在指定时间前发送心跳包，否则踢出
+    using MsgHeaderPtr = std::unique_ptr<STRUC_MSG_HEADER>;
+    
+    // 自动计算过期时间
+    const auto expiration = time(nullptr) + m_iWaitTime; 
 
-    std::lock_guard<std::mutex> lock(m_timequeueMutex); // 互斥锁
-    LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)memory.AllocMemory(sizeof(STRUC_MSG_HEADER), false); // 分配内存
-    pMsgHeader->pConn = pConn; // 记录连接指针
-    pMsgHeader->iCurrsequence = pConn->iCurrsequence; // 记录当前序列号
-    m_timeQueuemap.insert(std::make_pair(currTime, pMsgHeader)); // 按键自动排序
-    m_cur_size_++; // 记录当前队列大小
-    m_timer_value_ = GetEarliestTime(); // 计时队列头部时间值保存到m_timer_value_里
+    // 自动内存管理
+    auto pMsgHeader = std::make_unique<STRUC_MSG_HEADER>();
+    pMsgHeader->pConn = pConn;
+    pMsgHeader->iCurrsequence = pConn->iCurrsequence;
+
+    // RAII锁管理
+    {
+        std::lock_guard<std::mutex> lock(m_timequeueMutex);
+        
+        // 自动排序容器
+        m_timeQueuemap.emplace(expiration, std::move(pMsgHeader));
+        
+        m_cur_size_++; // 记录当前队列大小
+        m_timer_value_ = GetEarliestTime();
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    // CMemory memory = CMemory::getInstance();
+
+    // time_t currTime = time(nullptr); // 获取当前时间
+    // currTime += m_iWaitTime; // 计算下次踢出时间，需要在指定时间前发送心跳包，否则踢出
+
+    // std::lock_guard<std::mutex> lock(m_timequeueMutex); // 互斥锁
+    // LPSTRUC_MSG_HEADER pMsgHeader = (LPSTRUC_MSG_HEADER)memory.AllocMemory(sizeof(STRUC_MSG_HEADER), false); // 分配内存
+    // pMsgHeader->pConn = pConn; // 记录连接指针
+    // pMsgHeader->iCurrsequence = pConn->iCurrsequence; // 记录当前序列号
+    // m_timeQueuemap.insert(std::make_pair(currTime, pMsgHeader)); // 按键自动排序
+    // m_cur_size_++; // 记录当前队列大小
+    // m_timer_value_ = GetEarliestTime(); // 计时队列头部时间值保存到m_timer_value_里
 
 
 }
 time_t CSocket::GetEarliestTime()
 { // 从multimap中获得最早时间返回
 
-    std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator pos;
-    pos = m_timeQueuemap.begin();
-    return pos->first; // 返回最早时间
+    return !m_timeQueuemap.empty() ? m_timeQueuemap.begin()->first : 0;
 
 }
+
 LPSTRUC_MSG_HEADER CSocket::RemoveFirstTimer()
 { // 从m_timeQueuemap中移除最早的时间，并把最早时间所指项的值所对应的指针返回，调用者负责互斥
     std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator pos;
@@ -53,74 +85,128 @@ LPSTRUC_MSG_HEADER CSocket::RemoveFirstTimer()
 }
 LPSTRUC_MSG_HEADER CSocket::GetOverTimeTimer(time_t currTime)
 { // 根据所给时间，从m_timerQueuemap中找到比这个时间更早的节点【1个】返回，这些节点都是时间超过，需要处理
-    CMemory memory = CMemory::getInstance();
-    LPSTRUC_MSG_HEADER pMsgHeader = nullptr;
-
-    if(m_cur_size_ == 0 || m_timeQueuemap.empty())
+    
+    LPSTRUC_MSG_HEADER pMsgHeader;
+    
     {
-        return NULL;
-    }
+        std::lock_guard<std::mutex> lock(m_timequeueMutex);
+        
+        // 合并时间获取与空队列判断
+        if(m_timeQueuemap.empty() || GetEarliestTime() > currTime)
+            return nullptr;
 
-    time_t earliestTime = GetEarliestTime(); // 获得最早时间
-    if(earliestTime <= currTime)
-    {
-        // 存在超时节点
-        pMsgHeader = RemoveFirstTimer(); // 获得指针
-        if(m_ifTimeOutKick != 1)
-        {
-            // 如果不是超时就踢人的情况，则把超时节点重新加入队列，并更新时间
-            time_t newTime = currTime + m_iWaitTime; // 计算下次踢出时间
-            LPSTRUC_MSG_HEADER tmpMsgHeader = (LPSTRUC_MSG_HEADER)memory.AllocMemory(sizeof(STRUC_MSG_HEADER), false); // 分配内存
-            tmpMsgHeader->pConn = pMsgHeader->pConn; // 记录连接指针
-            tmpMsgHeader->iCurrsequence = pMsgHeader->iCurrsequence; // 记录当前序列号
-            m_timeQueuemap.insert(std::make_pair(newTime, tmpMsgHeader)); // 按键自动排序
-            m_cur_size_++; // 记录当前队列大小
+        // 超时
+        pMsgHeader = RemoveFirstTimer();
+
+        // 非踢出模式逻辑优化
+        if(!m_ifTimeOutKick) {
+            LPSTRUC_MSG_HEADER newHeader = pMsgHeader; // 拷贝构造
+            m_timeQueuemap.emplace(currTime + m_iWaitTime, newHeader);
+            m_cur_size_++;
         }
 
-        if(m_cur_size_ > 0)
-        {
-            m_timer_value_ = GetEarliestTime(); // 计时队列头部时间值保存到m_timer_value_里
-        }
-        return pMsgHeader; // 返回指针
+        // 时间戳直接取自容器
+        m_timer_value_ = m_timeQueuemap.empty() ? 0 : GetEarliestTime();
+        
     }
-    return NULL; // 没有超时节点
+    
+    return pMsgHeader; 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    // CMemory memory = CMemory::getInstance();
+    // LPSTRUC_MSG_HEADER pMsgHeader;
+
+    // if(m_cur_size_ == 0 || m_timeQueuemap.empty())
+    // {
+    //     return NULL;
+    // }
+
+    // time_t earliestTime = GetEarliestTime(); // 获得最早时间
+    // if(earliestTime <= currTime)
+    // {
+    //     // 存在超时节点
+    //     pMsgHeader = RemoveFirstTimer(); // 获得指针
+    //     if(m_ifTimeOutKick != 1)
+    //     {
+    //         // 如果不是超时就踢人的情况，则把超时节点重新加入队列，并更新时间
+    //         time_t newTime = currTime + m_iWaitTime; // 计算下次踢出时间
+    //         LPSTRUC_MSG_HEADER tmpMsgHeader = (LPSTRUC_MSG_HEADER)memory.AllocMemory(sizeof(STRUC_MSG_HEADER), false); // 分配内存
+    //         tmpMsgHeader->pConn = pMsgHeader->pConn; // 记录连接指针
+    //         tmpMsgHeader->iCurrsequence = pMsgHeader->iCurrsequence; // 记录当前序列号
+    //         m_timeQueuemap.insert(std::make_pair(newTime, tmpMsgHeader)); // 按键自动排序
+    //         m_cur_size_++; // 记录当前队列大小
+    //     }
+
+    //     if(m_cur_size_ > 0)
+    //     {
+    //         m_timer_value_ = GetEarliestTime(); // 计时队列头部时间值保存到m_timer_value_里
+    //     }
+    //     return pMsgHeader; // 返回指针
+    // }
+    // return NULL; // 没有超时节点
 }
 void CSocket::DeleteFromTimerQueue(lpngx_connection_t pconn)
 {// 把指定用户tcp连接从timer表中去除
 
-    std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator pos, posend;
-    CMemory memory = CMemory::getInstance();
-    std::lock_guard<std::mutex> lock(m_timequeueMutex); // 互斥锁
+    std::lock_guard<std::mutex> lock(m_timequeueMutex);
 
-lblMTQM:
-    pos = m_timeQueuemap.begin();
-    posend = m_timeQueuemap.end();
-    for(; pos != posend; pos++)
+    // 使用现代遍历删除模式
+    std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator it = m_timeQueuemap.begin();
+    while(it != m_timeQueuemap.end())
     {
-        if(pos->second->pConn == pconn)
-        {
-            memory.FreeMemory(pos->second);
-            m_timeQueuemap.erase(pos);
+        if(it->second->pConn.lock() == pconn) {
+            // unique_ptr自动释放内存
+            it = m_timeQueuemap.erase(it);  // C++11起erase返回下一个迭代器
             m_cur_size_--;
-            goto lblMTQM;
+        } else {
+            ++it;
         }
     }
-    if(m_cur_size_ > 0)
-    {
-        m_timer_value_ = GetEarliestTime(); // 计时队列头部时间值保存到m_timer_value_里
-    }
+
+    // 自动更新最近过期时间
+    m_timer_value_ = GetEarliestTime();
+//     std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator pos, posend;
+//     CMemory memory = CMemory::getInstance();
+//     std::lock_guard<std::mutex> lock(m_timequeueMutex); // 互斥锁
+
+// lblMTQM:
+//     pos = m_timeQueuemap.begin();
+//     posend = m_timeQueuemap.end();
+//     for(; pos != posend; pos++)
+//     {
+//         if(pos->second->pConn == pconn)
+//         {
+//             memory.FreeMemory(pos->second);
+//             m_timeQueuemap.erase(pos);
+//             m_cur_size_--;
+//             goto lblMTQM;
+//         }
+//     }
+//     if(m_cur_size_ > 0)
+//     {
+//         m_timer_value_ = GetEarliestTime(); // 计时队列头部时间值保存到m_timer_value_里
+//     }
 }
 void CSocket::clearAllFromTimerQueue()
 { // 清理时间队列所有内容
-    std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator pos, posend;
-    CMemory memory = CMemory::getInstance();
-    pos = m_timeQueuemap.begin();
-    posend = m_timeQueuemap.end();
-    for(; pos != posend; pos++)
-    {
-        memory.FreeMemory(pos->second);
-        --m_cur_size_;
-    }
+    // std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator pos, posend;
+    // CMemory memory = CMemory::getInstance();
+    // pos = m_timeQueuemap.begin();
+    // posend = m_timeQueuemap.end();
+    // for(; pos != posend; pos++)
+    // {
+    //     memory.FreeMemory(pos->second);
+    //     --m_cur_size_;
+    // }
+    std::lock_guard<std::mutex> lock(m_timequeueMutex);
     m_timeQueuemap.clear();
 }
 
@@ -174,8 +260,8 @@ void* CSocket::ServerTimerQueueMonitorThread(void* threadData)
 // 心跳包检查时间到，检查心跳包是否超时，子类函数需要重新实现该函数的具体判断
 void CSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg,time_t cur_time)
 {
-	CMemory p_memory = CMemory::getInstance();
-	p_memory.FreeMemory(tmpmsg);    
+	// CMemory p_memory = CMemory::getInstance();
+	// p_memory.FreeMemory(tmpmsg);    
 }
 
 

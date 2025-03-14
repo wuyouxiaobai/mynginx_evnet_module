@@ -29,8 +29,17 @@ namespace WYXB
 
 // typedef void (CSocket::*ngx_event_handler_pt)(lpngx_connection_t c); // 定义成员函数指针
 
+// // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
+typedef struct _STRUC_MSG_HEADER
+{
+    std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
+    uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
+    //......其他以后扩展
+} STRUC_MSG_HEADER;
+
+
+
 class CSocket;
-struct STRUC_MSG_HEADER;
 struct ngx_listening_s;
 struct ngx_connection_s;
 
@@ -171,19 +180,6 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
 
 
 
-
-
-
-
-
-
-// // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
-typedef struct _STRUC_MSG_HEADER
-{
-    std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
-    uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
-    //......其他以后扩展
-} STRUC_MSG_HEADER;
 
 
 
