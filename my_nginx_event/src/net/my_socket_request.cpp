@@ -1,17 +1,17 @@
-// #include "my_socket.h"
-// #include "my_func.h"
-// #include "my_memory.h"
-// #include <arpa/inet.h>
-// #include <cstring>
-// #include "my_global.h"
+#include "my_socket.h"
+#include "my_func.h"
+#include "my_memory.h"
+#include <arpa/inet.h>
+#include <cstring>
+#include "my_global.h"
 
-// namespace WYXB
-// {
+namespace WYXB
+{
 
 
 
 // // 来数据的时候处理，当连接上有数据来的时候，本函数会被ngx_epoll_process_events()调用
-// void CSocket::ngx_read_request_handler(lpngx_connection_t pConn) //设置数据来时的读回调函数
+void CSocket::ngx_read_request_handler(lpngx_connection_t pConn){} //设置数据来时的读回调函数
 // {
 //     bool isflood = false; // 是否是flood攻击
 //     ngx_log_stderr(errno,"CSocekt::ngx_read_request_handler() before recvproc" );
@@ -222,7 +222,7 @@
 // }
 
 // // 发送数据专用函数，返回发送的字节数
-// // 返回=0，对方中断； 返回=-1，errno == EAGAIN，对方缓冲区满了；返回-2，errno ！= EAGAIN ！= EWOULDBLOCK ！= EINTR，也认为对端断开
+// // // 返回=0，对方中断； 返回=-1，errno == EAGAIN，对方缓冲区满了；返回-2，errno ！= EAGAIN ！= EWOULDBLOCK ！= EINTR，也认为对端断开
 // ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送到客户端
 // {
 //     ssize_t n;
@@ -258,7 +258,7 @@
 
 
 // // 设置数据发送时的写处理函数，当epoll通知我们时，我们在 int CSocekt::ngx_epoll_process_events(int timer)  中调用此函数
-// void CSocket::ngx_write_response_handler(lpngx_connection_t pConn)
+void CSocket::ngx_write_response_handler(lpngx_connection_t pConn){}
 // {
 //     CMemory memory = CMemory::getInstance();
 
@@ -305,4 +305,4 @@
 
 
 
-// }
+}

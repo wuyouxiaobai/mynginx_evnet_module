@@ -1,6 +1,7 @@
 #pragma once
-#include "my_slogic.h"
-#include "my_http/my_http_response.h"
+// #include "my_slogic.h"
+#include "my_http_response.h"
+#include "my_http_request.h"
 #include <regex>
 #include <memory>
 

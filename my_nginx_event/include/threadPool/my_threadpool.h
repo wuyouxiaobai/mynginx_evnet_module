@@ -45,9 +45,10 @@ private:
         std::thread _Thread;
         // pthread_t _Handle; // 线程句柄
         std::weak_ptr <CThreadPool> _pThis; // 记录所属线程池
+        void tie(std::shared_ptr<CThreadPool> pThis);
         bool ifrunning; // 线程是否正常启动，启动起来后，才允许调用stopAll()
 
-        ThreadItem(std::shared_ptr<CThreadPool>& pThis);
+        ThreadItem();
 
         ~ThreadItem();
     };

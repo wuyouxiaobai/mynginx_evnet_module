@@ -60,11 +60,13 @@ bool CLogicSocket::regist()
             resp->setBody("Dynamic PONG");
         }
     );
+
+    return true;
 }
 
 
 //处理接收消息队列中的消息，由线程池调用
-void CLogicSocket::threadRecvProFunc(std::vector<uint8_t>&& pMsgBuf)
+void CLogicSocket::threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf)
 {
     // 检查缓冲区大小是否至少包含头部
     if (pMsgBuf.size() < sizeof(STRUC_MSG_HEADER)) {
@@ -263,54 +265,55 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
 
 
 
-// 心跳包检测时间到，该去检测心跳包是否超时的事宜，本函数是子类函数，实现具体的判断动作
-void CLogicSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t cur_time)
-{
-    CMemory memory = CMemory::getInstance();
-    if(tmpmsg->iCurrsequence == tmpmsg->pConn->iCurrsequence)//此连接没断
-    {
-        lpngx_connection_t p_Conn = tmpmsg->pConn;
-        if(m_ifTimeOutKick == 1)
-        {
-            zdClosesocketProc(p_Conn);
-        }
-        else if((cur_time - p_Conn->lastPingTime) > (m_iWaitTime*3+10))//超时踢的判断标准就是 每次检查的时间间隔*3，超过这个时间没发送心跳包，就踢【大家可以根据实际情况自由设定】
-        {
-            zdClosesocketProc(p_Conn);
-        }
-        memory.FreeMemory(tmpmsg);
+// // 心跳包检测时间到，该去检测心跳包是否超时的事宜，本函数是子类函数，实现具体的判断动作
+void CLogicSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t cur_time){}
+// {
+//     CMemory memory = CMemory::getInstance();
+//     if(tmpmsg->iCurrsequence == tmpmsg->pConn->iCurrsequence)//此连接没断
+//     {
+//         lpngx_connection_t p_Conn = tmpmsg->pConn;
+//         if(m_ifTimeOutKick == 1)
+//         {
+//             zdClosesocketProc(p_Conn);
+//         }
+//         else if((cur_time - p_Conn->lastPingTime) > (m_iWaitTime*3+10))//超时踢的判断标准就是 每次检查的时间间隔*3，超过这个时间没发送心跳包，就踢【大家可以根据实际情况自由设定】
+//         {
+//             zdClosesocketProc(p_Conn);
+//         }
+//         memory.FreeMemory(tmpmsg);
 
-    }
-    else
-    {
-        memory.FreeMemory(tmpmsg);
-    }
-    return;
-}
-
-
+//     }
+//     else
+//     {
+//         memory.FreeMemory(tmpmsg);
+//     }
+//     return;
+// }
 
 
 
 
-// 发送没有包体的数据包给客户端
-void CLogicSocket::SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t iMsgCode)
-{
-    CMemory memory = CMemory::getInstance();
-
-    char* p_sendbuf = (char*)memory.AllocMemory(m_iLenMsgHeader+m_iLenPkgHeader, false);
-    char* p_tmpbuf = p_sendbuf;
-
-    memcpy(p_tmpbuf, pMsgHeader, m_iLenMsgHeader);
-    p_tmpbuf += m_iLenMsgHeader;
-
-    LPCOMM_PKG_HEADER pPkgHeader = (LPCOMM_PKG_HEADER)p_tmpbuf; // 指向要发出去的包头
-    pPkgHeader->msgCode = htons(iMsgCode);
-    pPkgHeader->pkgLen = htonl(m_iLenPkgHeader);
-    pPkgHeader->crc32 = 0;
-    msgSend(p_sendbuf);
-    return;
 
 
+// // 发送没有包体的数据包给客户端
+void CLogicSocket::SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t iMsgCode){}
+// {
+//     CMemory memory = CMemory::getInstance();
 
+//     char* p_sendbuf = (char*)memory.AllocMemory(m_iLenMsgHeader+m_iLenPkgHeader, false);
+//     char* p_tmpbuf = p_sendbuf;
+
+//     memcpy(p_tmpbuf, pMsgHeader, m_iLenMsgHeader);
+//     p_tmpbuf += m_iLenMsgHeader;
+
+//     LPCOMM_PKG_HEADER pPkgHeader = (LPCOMM_PKG_HEADER)p_tmpbuf; // 指向要发出去的包头
+//     pPkgHeader->msgCode = htons(iMsgCode);
+//     pPkgHeader->pkgLen = htonl(m_iLenPkgHeader);
+//     pPkgHeader->crc32 = 0;
+//     msgSend(p_sendbuf);
+//     return;
+
+
+
+// }
 }

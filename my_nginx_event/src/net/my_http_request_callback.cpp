@@ -138,7 +138,7 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
 // }
 
 // http响应未发送完时继续发送的回调
-void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
+void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
 {
 
 
@@ -147,7 +147,7 @@ void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
     auto pMsgbuf = pConn->psendbuf;
     STRUC_MSG_HEADER header;
     std::memcpy(&header, pMsgbuf.peek(), sizeof(STRUC_MSG_HEADER));
-    lpngx_connection_t pConn;
+    // lpngx_connection_t pConn;
 
     // 消息头验证
     // 确保连接有效性和数据完整性检查
@@ -192,8 +192,8 @@ void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
             if (errno == EAGAIN || errno == EWOULDBLOCK) 
             {
                 STRUC_MSG_HEADER newHeader{
-                    .iCurrsequence = pConn->iCurrsequence,
-                    .pConn = pConn
+                    .pConn = pConn,
+                    .iCurrsequence = pConn->iCurrsequence
                 };
                 pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
                 pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
@@ -264,5 +264,39 @@ void CSocket::ngx_http_write_request_handler(lpngx_connection_t pConn)
     // pConn->psendMemPointer = NULL; // 重置指针
     // pConn->psendbuf = NULL; // 重置指针
 }
+
+ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送到客户端
+{
+    ssize_t n;
+    for(;;)
+    {
+        n = send(c->fd, buff.peek(), buff.readableBytes(), 0);
+        if(n > 0) // 发送成功
+        {
+            return n;
+        }
+        if(n == 0)
+        {
+            return 0; // 对方关闭连接
+        }
+        if(errno == EINTR) // 内核缓冲区满了
+        {
+            return -1;
+
+        }
+        if(errno == EINTR)
+        {
+            // 收到某个信号，不认为出错
+            // 仅打印日志
+            ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
+        }
+        else
+        {
+            // 出错，但是不断开socket，等待recv来统一处理断开，因为多线程时处理send和recv断开不容易
+            return -2;
+        }
+    }
+}
+
 
 }

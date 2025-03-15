@@ -5,8 +5,10 @@
 #include "router.h"
 
 
+
 namespace WYXB
 {
+class Router;
 
 class CLogicSocket : public CSocket
 {
@@ -14,12 +16,12 @@ class CLogicSocket : public CSocket
 
 public:
     CLogicSocket() = default;
-    virtual ~CLogicSocket();
+    virtual ~CLogicSocket() = default;
     virtual bool Initialize();
 
 public:
     // 解析http请求的函数
-    virtual void threadRecvProFunc(std::vector<uint8_t>&& pMsgBuf);
+    virtual void threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf);
 
 private:
 

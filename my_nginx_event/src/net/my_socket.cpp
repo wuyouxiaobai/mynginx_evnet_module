@@ -16,7 +16,11 @@
 
 namespace WYXB
 {
-CSocket::ThreadItem::ThreadItem(std::shared_ptr<CSocket>& pThis): _pThis(pThis){}
+void CSocket::ThreadItem::tie(std::shared_ptr<CSocket> pThis)
+{
+    _pThis = pThis;
+}
+CSocket::ThreadItem::ThreadItem(){}
 CSocket::ThreadItem::~ThreadItem(){}
 
 CSocket::CSocket()
@@ -233,12 +237,13 @@ bool CSocket::Initialize_subproc()
     }
 
 // 创建发送线程线程
-    auto pSendQueue = std::make_shared<ThreadItem>(shared_from_this()); //专门用来发送数据的线程
+    auto pSendThread = std::make_shared<ThreadItem>(); //专门用来发送数据的线程
+    pSendThread->tie(shared_from_this());
     // 使用 lambda 捕获 shared_ptr，确保线程内对象存活
-    pSendQueue->_Thread = std::thread([pSendQueue]() {
-        ServerSendQueueThread(pSendQueue.get());  // 传递原始指针或智能指针
+    pSendThread->_Thread = std::thread([pSendThread]() {
+        ServerSendQueueThread(pSendThread.get());  // 传递原始指针或智能指针
     });
-    m_threadVector.push_back(std::move(pSendQueue)); //创建新线程并存入
+    m_threadVector.push_back(std::move(pSendThread)); //创建新线程并存入
     // ThreadItem* pRecyconn; //专门用来回收连接的线程
     // m_threadVector.push_back(pRecyconn = new ThreadItem(this)); //创建新线程并存入
     // err = pthread_create(&pRecyconn->_Handle, NULL, ServerRecyConnectionThread, pRecyconn);
@@ -249,11 +254,12 @@ bool CSocket::Initialize_subproc()
     // }
 
 // 创建回收线程
-    auto pRecyconn = std::make_shared<ThreadItem>(shared_from_this()); //专门用来发送数据的线程
-    pRecyconn->_Thread = std::thread([pRecyconn]() {
-        ServerRecyConnectionThread(pRecyconn.get());  // 传递原始指针或智能指针
+    auto pRecyThread = std::make_shared<ThreadItem>(); //专门用来发送数据的线程
+    pRecyThread->tie(shared_from_this());
+    pRecyThread->_Thread = std::thread([pRecyThread]() {
+        ServerRecyConnectionThread(pRecyThread.get());  // 传递原始指针或智能指针
     });
-    m_threadVector.push_back(std::move(pRecyconn)); //创建新线程并存入
+    m_threadVector.push_back(std::move(pRecyThread)); //创建新线程并存入
     // if (!pRecyconn) {
     //     ngx_log_stderr(0, "CSocket::Initialize_subproc()中new ThreadItem失败.");
     //     return false;
@@ -273,7 +279,8 @@ bool CSocket::Initialize_subproc()
     if(m_ifkickTimeCount == 1)  //是否开启踢人时钟，1：开启   0：不开启
     {
 // 创建超时踢人线程
-        auto pTimemonitor = std::make_shared<ThreadItem>(shared_from_this()); //专门用来发送数据的线程
+        auto pTimemonitor = std::make_shared<ThreadItem>(); //专门用来发送数据的线程
+        pTimemonitor->tie(shared_from_this());
         pTimemonitor->_Thread = std::thread([pTimemonitor]() {
             ServerTimerQueueMonitorThread(pTimemonitor.get());  // 传递原始指针或智能指针
         });
@@ -808,8 +815,8 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                         tmpbuf.retrieve(sendsize);
                         // 添加新消息头到剩余数据前
                         STRUC_MSG_HEADER newHeader{
-                            .iCurrsequence = pConn->iCurrsequence,
-                            .pConn = pConn
+                            .pConn = pConn,
+                            .iCurrsequence = pConn->iCurrsequence
                         };
                         pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
                         pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
@@ -820,8 +827,8 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                 } else if (sendsize == -1) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         STRUC_MSG_HEADER newHeader{
-                            .iCurrsequence = pConn->iCurrsequence,
-                            .pConn = pConn
+                            .pConn = pConn,
+                            .iCurrsequence = pConn->iCurrsequence
                         };
                         pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
                         pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());

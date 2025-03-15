@@ -1,4 +1,4 @@
-#include "my_http/my_http_context.h"
+#include "my_http_context.h"
 #include <algorithm>
 #include <cstring>
 
@@ -73,16 +73,15 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
 
                     // 解析Header键值对
                     const char* colon = static_cast<const char*>(
-                        memchr(buffer_.data()+parsed_pos_, ':', crlf - parsed_pos_));
+                        memchr(buffer_.data() + parsed_pos_, ':', crlf - parsed_pos_));
                     if (colon) {
-                        //Header解析
-                            std::string key(buffer_.data()+parsed_pos_, colon);
-                            std::string val(colon+1, buffer_.data()+crlf);
-                            request_.addHeader(
-                                std::move(key.erase(key.find_last_not_of(" \t")+1)),
-                                std::move(val.erase(0, val.find_first_not_of(" \t")))
-                            );
-                        
+                        // Header解析
+                        std::string key(buffer_.data() + parsed_pos_, colon - (buffer_.data() + parsed_pos_)); // 使用长度构造
+                        std::string val(colon + 1, (buffer_.data() + crlf) - (colon + 1)); // 使用迭代器构造
+                        request_.addHeader(
+                            std::move(key.erase(key.find_last_not_of(" \t") + 1)),
+                            std::move(val.erase(0, val.find_first_not_of(" \t")))
+                        );
                     } else {
                         isErr = true;
                         ok = false; // 非法Header格式

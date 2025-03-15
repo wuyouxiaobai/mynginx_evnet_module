@@ -29,13 +29,7 @@ namespace WYXB
 
 // typedef void (CSocket::*ngx_event_handler_pt)(lpngx_connection_t c); // 定义成员函数指针
 
-// // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
-typedef struct _STRUC_MSG_HEADER
-{
-    std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
-    uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
-    //......其他以后扩展
-} STRUC_MSG_HEADER;
+
 
 
 
@@ -45,13 +39,18 @@ struct ngx_connection_s;
 
 using lpngx_listening_t = std::shared_ptr<ngx_listening_s>;
 using lpngx_connection_t = std::shared_ptr<ngx_connection_s>;
-using LPSTRUC_MSG_HEADER = std::shared_ptr<STRUC_MSG_HEADER>;
 using ngx_event_handler = std::function<void(lpngx_connection_t)>;
 
 
 
-
-
+// // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
+typedef struct _STRUC_MSG_HEADER
+{
+    std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
+    uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
+    //......其他以后扩展
+} STRUC_MSG_HEADER;
+using LPSTRUC_MSG_HEADER = std::shared_ptr<STRUC_MSG_HEADER>;
 
 // 一些专用结构定义放在这里，暂时不考虑放ngx_global.h里了
 // struct ngx_listening_s // 和监听端口有关的结构
@@ -130,7 +129,7 @@ struct ngx_listening_s {
 struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s> 
 {
     ngx_connection_s();
-    virtual ~ngx_connection_s() = default;
+    virtual ~ngx_connection_s();
     
 
     void GetOneToUse(int sockfd); // 分配出去的时候初始化
@@ -142,7 +141,7 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
     lpngx_listening_t listening; // 所属监听
 
 
-    std::atomic<int> iCurrsequence{0};// 包的序号
+    std::atomic<uint64_t> iCurrsequence{0};// 包的序号
     sockaddr s_sockaddr; // 保存对方地址信息
 
 // epoll相关
@@ -203,7 +202,7 @@ public:
 
     void printTDInfo(); // 打印统计信息
 public:
-    virtual void threadRecvProcFunc(char* pMsgBuf); // 处理客户端请求
+    virtual void threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf){}; // 处理http请求
     virtual void procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t currTime); // 心跳包检测时间到，去检测心跳包是否超时，本函数只释放内存，子函数应该重写具体操作
 
 public:
@@ -236,7 +235,7 @@ private:
 
     void clearMsgSendQueue(); // 处理发送消息队列
 protected:
-    ssize_t sendproc(lpngx_connection_t c, Buffer buff);// 将数据发送到客户端
+    ssize_t sendproc(lpngx_connection_t c, Buffer buff);// 将数据发送
 private:
     // 获得对端信息相关
     size_t ngx_sock_ntop(struct sockaddr *sa, int port, u_char *text, size_t len); // 根据参数1获得对端信息，获得地址端口字符串，返回这个字符串长度
@@ -281,7 +280,9 @@ private:
         std::weak_ptr <CSocket> _pThis; // 记录所属socket
         // bool ifrunning; // 线程是否正常启动，启动起来后，才允许调用stopAll()
 
-        ThreadItem(std::shared_ptr<CSocket>& pThis);
+        void tie(std::shared_ptr<CSocket> pThis);
+
+        ThreadItem();
 
         ~ThreadItem();
     };
@@ -334,7 +335,7 @@ private:
 private:
     // http相关
     void ngx_http_read_request_handler(lpngx_connection_t pConn); //设置http数据来时的读回调函数
-    void ngx_http_write_request_handler(lpngx_connection_t pConn); //设置http数据发出时的写回调函数
+    void ngx_http_write_response_handler(lpngx_connection_t pConn); //设置http数据发出时的写回调函数
     // std::shared_ptr<HttpGetProcessor> m_httpGetProcessor;
 
 };

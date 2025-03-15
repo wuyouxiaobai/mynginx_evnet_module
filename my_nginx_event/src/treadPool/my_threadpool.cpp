@@ -3,8 +3,11 @@
 
 namespace WYXB
 {
-
-CThreadPool::ThreadItem::ThreadItem(std::shared_ptr<CThreadPool>& pThis): _pThis(pThis), ifrunning(false){}
+void CThreadPool::ThreadItem::tie(std::shared_ptr<CThreadPool> pThis)
+{
+    _pThis = pThis;
+}
+CThreadPool::ThreadItem::ThreadItem(): ifrunning(false){}
 
 CThreadPool::ThreadItem::~ThreadItem(){}
 
@@ -29,7 +32,8 @@ bool CThreadPool::Create(int threadNum)
 
     try {
         for (int i = 0; i < m_iThreadNum; ++i) {
-            auto pItem = std::make_unique<ThreadItem>(shared_from_this());
+            auto pItem = std::make_unique<ThreadItem>();
+            pItem->tie(shared_from_this());
             // 创建线程并绑定执行逻辑
             pItem->_Thread = std::thread([pItem = pItem.get()] {
                 ThreadFunc(pItem);
@@ -194,7 +198,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
         
         try {
             if (!buf.empty()) {
-                g_socket.threadRecvProFunc(std::move(buf));
+                g_socket.threadRecvProcFunc(std::move(buf));
             }
         } catch(...) {
             // 异常处理
