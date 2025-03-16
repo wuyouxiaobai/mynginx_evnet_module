@@ -1,5 +1,6 @@
 #include "my_threadpool.h"
 #include <algorithm>
+#include <thread>
 
 namespace WYXB
 {
@@ -198,7 +199,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
         
         try {
             if (!buf.empty()) {
-                g_socket.threadRecvProcFunc(std::move(buf));
+                Server::instance().g_socket->threadRecvProcFunc(std::move(buf));
             }
         } catch(...) {
             // 异常处理

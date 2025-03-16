@@ -53,7 +53,7 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
     // 处理接收结果
     if (n > 0) {
         buffer.resize(sizeof(STRUC_MSG_HEADER) + n);
-        g_threadpool.inMsgRecvQueueAndSignal(std::move(buffer));
+        Server::instance().g_threadpool->inMsgRecvQueueAndSignal(std::move(buffer));
         return;
     }
 

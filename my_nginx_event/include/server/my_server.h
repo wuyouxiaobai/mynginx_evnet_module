@@ -6,7 +6,7 @@
 #include "my_macro.h"
 #include "my_conf.h"
 #include "my_func.h"
-
+#include <memory>
 
 
 namespace WYXB
@@ -23,10 +23,26 @@ typedef struct
 
 class Server
 {
+friend class CSocket;
+friend class CLogicSocket;
+friend class Logger;
 public:
-    Server();
+    Server(): g_socket(std::make_shared<CLogicSocket>()), g_threadpool(std::make_shared<CThreadPool>()) {}
+    ~Server() = default;
 
-private:
+    int start(int argc, char*const *argv);
+
+    void freeresource()
+    {
+
+        if(gp_envmem)
+        {
+            delete []gp_envmem;
+            gp_envmem = NULL;
+        }
+
+        Logger::ngx_log_close();
+    }
 
     static Server& instance() {
         static Server server; // 单例对象
@@ -54,9 +70,6 @@ private:
     char *gp_envmem{NULL};//指向自己分配的env环境变量的内存，在ngx_init_setproctitle()函数中会被分配内存
     int g_daemonized{0};//是否以守护进程运行，开启:1 关闭:0
 
-//CSocket的全局变量
-    CLogicSocket g_socket; //socket通信的逻辑层对象
-    CThreadPool g_threadpool; //线程池对象
 
 //进程本身相关的全局变量
     pid_t ngx_pid; //当前进程
@@ -66,6 +79,12 @@ private:
     int ngx_terminate;//进程优雅退出：1 继续：0
     pid_t ngx_processes[NGX_MAX_PROCESSES]; // 定义一个固定大小的数组  
     int ngx_last_process;//工作进程数量
+
+//标记子进程状态变化[一般是子进程发来SIGCHLD信号表示退出],sig_atomic_t:系统定义的类型：访问或改变这些变量需要在计算机的一条指令内完成
+//一般等价于int【通常情况下，int类型的变量通常是原子访问的，也可以认为 sig_atomic_t就是int类型的数据】  
+    sig_atomic_t ngx_reap;
+
+    
 
 private:
 //设置可执行程序标题相关函数
@@ -105,5 +124,15 @@ private:
 
 //守护进程
     int ngx_daemon();
+
+public:
+
+
+//线程池
+    std::shared_ptr<CThreadPool> g_threadpool;
+
+//socket相关
+    std::shared_ptr<CLogicSocket> g_socket;
+
 };
 } // namespace WYXB

@@ -12,6 +12,7 @@
 #include <thread>
 #include <iostream>
 #include <string_view>
+#include "my_server.h"
 
 
 namespace WYXB
@@ -506,7 +507,7 @@ void CSocket::printTDInfo()
     if(currtime - m_lastprintTime > 10)
     {
         // 超过10s打印一次
-        int tmprmqc = g_threadpool.getRecvMsgQueueCount(); 
+        int tmprmqc = Server::instance().g_threadpool->getRecvMsgQueueCount(); 
 
         m_lastprintTime = currtime;
         int tmpoLUC = m_onlineUserCount;
@@ -760,13 +761,13 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
     auto pSocket = pThreadItem->_pThis.lock();
     if (!pSocket) return nullptr;
 
-    while (g_stopEvent == 0) {
+    while (Server::instance().g_stopEvent == 0) {
         // 等待信号量
         if (sem_wait(&pSocket->m_semEventSendQueue) == -1 && errno != EINTR) {
             Logger::ngx_log_stderr(errno, "sem_wait失败");
         }
 
-        if (g_stopEvent != 0) break;
+        if (Server::instance().g_stopEvent != 0) break;
 
         // 消息队列处理
         {

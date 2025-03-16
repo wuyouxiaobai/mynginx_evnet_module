@@ -16,7 +16,7 @@
 #include <functional>
 #include "Buffer.h"
 #include "my_logger.h"
-
+#include "my_server.h"
 
 
 #define NGX_LISTEN_BACKLOG 511 // 已完成连接队列，nginx给511，我们也先按照这个来：不懂这个数字的同学参考第五章第四节
@@ -338,6 +338,7 @@ private:
     void ngx_http_read_request_handler(lpngx_connection_t pConn); //设置http数据来时的读回调函数
     void ngx_http_write_response_handler(lpngx_connection_t pConn); //设置http数据发出时的写回调函数
     // std::shared_ptr<HttpGetProcessor> m_httpGetProcessor;
+
 
 };
 

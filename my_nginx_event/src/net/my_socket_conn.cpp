@@ -397,7 +397,7 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
     std::vector<lpngx_connection_t> batch_cleanup; // 批量处理容器
     batch_cleanup.reserve(64); // 预分配空间
 
-    while (g_stopEvent == 0) {
+    while (Server::instance().g_stopEvent == 0) {
         // 每次直接休息200ms
         usleep(200 * 1000);
 

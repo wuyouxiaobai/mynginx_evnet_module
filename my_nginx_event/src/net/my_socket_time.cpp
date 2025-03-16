@@ -1,6 +1,8 @@
 #include "my_socket.h"
 #include "my_memory.h"
 #include "my_global.h"
+#include <unistd.h>
+
 
 
 namespace WYXB
@@ -222,7 +224,7 @@ void* CSocket::ServerTimerQueueMonitorThread(void* threadData)
     time_t absolute_time, curr_time;
     int err;
 
-    while(g_stopEvent == 0) // 不退出
+    while(Server::instance().g_stopEvent == 0) // 不退出
     {
         if(pSocket->m_cur_size_ > 0) // 队列不为空
         {

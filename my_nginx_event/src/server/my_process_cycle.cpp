@@ -228,8 +228,8 @@ void Server::ngx_worker_process_cycle(int inum,const char *pprocname)
     }
     
     // 子进程退出
-    g_threadpool.StopAll();
-    g_socket.Shotdown_subproc();
+    Server::instance().g_threadpool->StopAll();
+    Server::instance().g_socket->Shotdown_subproc();
 
 }
 
@@ -251,7 +251,7 @@ void Server::ngx_worker_process_init(int inum)
 // 创建线程池 
     MyConf* config = MyConf::getInstance(); //初始化配置文件
     int tmpthreadnum = config->GetIntDefault("ProcMsgRecvWorkThreadCount", 5); // 处理接收消息线程池中线程的数量，默认为5
-    if(g_threadpool.Create(tmpthreadnum) == false)// 工作进程创建线程池中线程（处理接受消息队列中的消息）
+    if(Server::instance().g_threadpool->Create(tmpthreadnum) == false)// 工作进程创建线程池中线程（处理接受消息队列中的消息）
     {
         //内存没释放，但是简单粗暴退出；
         exit(-2);
@@ -259,7 +259,7 @@ void Server::ngx_worker_process_init(int inum)
     sleep(1);
 
 // 创建ServerSendQueueThread、ServerRecyConnectionThread、ServerTimerQueueMonitorThread
-    if(g_socket.Initialize_subproc() == false) // 初始化子进程
+    if(Server::instance().g_socket->Initialize_subproc() == false) // 初始化子进程
     {
         //内存没释放，但是简单粗暴退出；
         exit(-2);
@@ -267,7 +267,7 @@ void Server::ngx_worker_process_init(int inum)
 
 
     //工作线程中创建listenfd，所有工作线程通过端口重用监听同一个端口，通过linux内核解决的负载均衡解决惊群问题
-    g_socket.ngx_epoll_init();           //初始化epoll相关内容，同时 往监听socket上增加监听事件，从而开始让监听端口履行其职责
+    Server::instance().g_socket->ngx_epoll_init();           //初始化epoll相关内容，同时 往监听socket上增加监听事件，从而开始让监听端口履行其职责
     //g_socket.ngx_epoll_listenportstart();//往监听socket上增加监听事件，从而开始让监听端口履行其职责【如果不加这行，虽然端口能连上，但不会触发ngx_epoll_process_events()里边的epoll_wait()往下走】
     
 

@@ -9,7 +9,7 @@
 #include <vector>
 #include "my_func.h"
 #include <unistd.h>
-#include "my_global.h"
+#include "my_server.h"
 #include <deque>
 #include "my_logger.h"
 
