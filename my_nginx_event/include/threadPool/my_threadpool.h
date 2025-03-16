@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include "my_global.h"
 #include <deque>
-
+#include "my_logger.h"
 
 namespace WYXB
 {

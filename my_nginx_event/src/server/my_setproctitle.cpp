@@ -1,12 +1,12 @@
 #include "my_global.h"
 #include <string.h>
-
+#include "my_server.h"
 
 
 namespace WYXB
 {
 // 设置可执行程序标题相关函数：分配内存，并把环境变量拷贝到新内存
-void ngx_init_setproctitle()
+void Server::ngx_init_setproctitle()
 {
     //这里无需判断penvmen == NULL,有些编译器new会返回NULL，有些会报异常，但不管怎样，如果在重要的地方new失败了，你无法收场，让程序失控崩溃，助你发现问题为好； 
     gp_envmem = new char[g_envneedmem];
@@ -27,7 +27,7 @@ void ngx_init_setproctitle()
 
 
 // 设置可执行程序标题
-void ngx_setproctitle(const char* title)
+void Server::ngx_setproctitle(const char* title)
 {
     // 计算新标题长度
     size_t ititlelen = strlen(title); 

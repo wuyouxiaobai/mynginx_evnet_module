@@ -15,6 +15,7 @@
 #include "my_http_context.h"
 #include <functional>
 #include "Buffer.h"
+#include "my_logger.h"
 
 
 
@@ -238,7 +239,7 @@ protected:
     ssize_t sendproc(lpngx_connection_t c, Buffer buff);// 将数据发送
 private:
     // 获得对端信息相关
-    size_t ngx_sock_ntop(struct sockaddr *sa, int port, u_char *text, size_t len); // 根据参数1获得对端信息，获得地址端口字符串，返回这个字符串长度
+    // size_t ngx_sock_ntop(struct sockaddr *sa, int port, u_char *text, size_t len); // 根据参数1获得对端信息，获得地址端口字符串，返回这个字符串长度
 
     //连接池
     void initconnection(); // 初始化连接池
@@ -265,7 +266,7 @@ private:
 
 protected:
     // 一些和网络通信相关成员变量
-    size_t m_iLenPkgHeader; // sizeof(COMM_PKG_HEADER))
+    // size_t m_iLenPkgHeader; // sizeof(COMM_PKG_HEADER))
     size_t m_iLenMsgHeader; // sizeof(STRUC_MSG_HEADER))
 
     //时间相关

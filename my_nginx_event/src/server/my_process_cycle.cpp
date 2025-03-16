@@ -1,14 +1,11 @@
 #include <sys/types.h>
 #include <unistd.h>
-#include "my_func.h"
-#include "my_macro.h"
 #include <errno.h>
-#include "my_global.h"
 #include <signal.h>
 #include "my_conf.h"
 #include "string.h"
 #include <sys/wait.h>
-
+#include "my_server.h"
 
 namespace WYXB
 {
@@ -29,7 +26,7 @@ static u_char master_process[] = "master process";
 
 
 // 主进程循环，创建worker子进程
-void ngx_master_process_cycle()
+void Server::ngx_master_process_cycle()
 {
     sigset_t set;        //信号集
 
@@ -52,7 +49,7 @@ void ngx_master_process_cycle()
     //设置，此时无法接受的信号；阻塞期间，你发过来的上述信号，多个会被合并为一个，暂存着，等你放开信号屏蔽后才能收到这些信号。。。
     if(sigprocmask(SIG_BLOCK, &set, NULL) == -1) //第一个参数用了SIG_BLOCK表明设置 进程 新的信号屏蔽字 为 “当前信号屏蔽字 和 第二个参数指向的信号集的并集
     {
-        ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_master_process_cycle()中sigprocmask()失败!");
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_master_process_cycle()中sigprocmask()失败!");
     }
     //即便sigprocmask失败，程序流程也会继续
 
@@ -71,7 +68,7 @@ void ngx_master_process_cycle()
             strcat(title, g_os_argv[i]);
         }
         ngx_setproctitle(title); //设置进程标题
-        ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【master进程】启动并开始运行......!",title,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【master进程】启动并开始运行......!",title,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
     }
     //首先我设置主进程标题---------end
 
@@ -98,7 +95,7 @@ void ngx_master_process_cycle()
             if (g_stopEvent) 
             { 
                 // 如果收到退出信号，优雅退出  
-                ngx_log_error_core(NGX_LOG_NOTICE, 0, "Master process exiting...");  
+                Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Master process exiting...");  
                 ngx_signal_worker_processes(SIGTERM); // 通知所有子进程退出  
 
                 // 等待所有子进程退出  
@@ -116,7 +113,7 @@ void ngx_master_process_cycle()
 }
 
 // 通知所有子进程退出  
-static void ngx_signal_worker_processes(int signo) {  
+void Server::ngx_signal_worker_processes(int signo) {  
     for (int i = 0; i < ngx_last_process; i++) {  
         if (ngx_processes[i] == -1) {  
             continue; // 跳过无效的子进程  
@@ -126,18 +123,18 @@ static void ngx_signal_worker_processes(int signo) {
 }  
 
 // 回收所有子进程  
-static void ngx_reap_worker_processes() {  
+void Server::ngx_reap_worker_processes() {  
     pid_t pid;  
     int status;  
 
     // 使用阻塞模式回收所有子进程  
     while ((pid = waitpid(-1, &status, 0)) > 0) {  
-        ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P exited with status %d.", pid, WEXITSTATUS(status));  
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P exited with status %d.", pid, WEXITSTATUS(status));  
     }  
 
     // 如果没有子进程，waitpid 会返回 -1，errno 会被设置为 ECHILD  
     if (pid == -1 && errno != ECHILD) {  
-        ngx_log_error_core(NGX_LOG_ALERT, errno, "waitpid() failed while reaping worker processes.");  
+        Logger::ngx_log_error_core(NGX_LOG_ALERT, errno, "waitpid() failed while reaping worker processes.");  
     }  
 }
 
@@ -145,7 +142,7 @@ static void ngx_reap_worker_processes() {
 
 //描述：根据给定的参数创建指定数量的子进程，因为以后可能要扩展功能，增加参数，所以单独写成一个函数
 //processnums:要创建的子进程数量
-static void ngx_start_worker_processes(int processnums)
+void Server::ngx_start_worker_processes(int processnums)
 {
     //创建子进程，由master进程执行该函数实现
     for(int i=0;i<processnums;i++)
@@ -162,7 +159,7 @@ static void ngx_start_worker_processes(int processnums)
 //描述：创建子进程，并调用worker_process_cycle函数，该函数负责处理请求
 //inum:子进程编号
 //pprocname:子进程名称
-static int ngx_spawn_process(int inum,const char *pprocname)
+int Server::ngx_spawn_process(int inum,const char *pprocname)
 {
     pid_t pid;
     
@@ -170,7 +167,7 @@ static int ngx_spawn_process(int inum,const char *pprocname)
     switch (pid)
     {
     case -1:
-        ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_spawn_process()fork()产生子进程num=%d,procname=\"%s\"失败!",inum,pprocname);
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_spawn_process()fork()产生子进程num=%d,procname=\"%s\"失败!",inum,pprocname);
         return -1;
     case 0: //子进程进入循环处理请求
         ngx_parent = ngx_pid;
@@ -190,7 +187,7 @@ static int ngx_spawn_process(int inum,const char *pprocname)
 //描述：worker子进程的功能函数，每个woker子进程，就在这里循环着了（无限循环【处理网络事件和定时器事件以对外提供web服务】）
 //     子进程分叉才会走到这里
 //inum：进程编号【0开始】
-static void ngx_worker_process_cycle(int inum,const char *pprocname) 
+void Server::ngx_worker_process_cycle(int inum,const char *pprocname) 
 {
     sigset_t empty_set;  
     sigemptyset(&empty_set); // 清空信号屏蔽集  
@@ -205,7 +202,7 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
     ngx_worker_process_init(inum);
 
     ngx_setproctitle(pprocname); //设置进程名
-    ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【worker进程】启动并开始运行......!",pprocname,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+    Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【worker进程】启动并开始运行......!",pprocname,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
 
     //测试代码，测试线程池的关闭
     //sleep(5); //休息5秒        
@@ -221,7 +218,7 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
         // 检查退出标志  
         if (g_stopEvent)   
         {  
-            ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P is exiting gracefully...", ngx_pid);  
+            Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P is exiting gracefully...", ngx_pid);  
             break; // 跳出循环，准备退出  
         }  
         // 处理网络事件和定时器事件
@@ -237,7 +234,7 @@ static void ngx_worker_process_cycle(int inum,const char *pprocname)
 }
 
 //描述：子进程创建时调用本函数进行一些初始化工作
-static void ngx_worker_process_init(int inum)
+void Server::ngx_worker_process_init(int inum)
 {
     sigset_t set; //信号集：用于定义一组信号，主要用于管理和控制信号的处理。可以通过信号集来屏蔽某些信号，或者检查某个信号是否被设置。
     sigemptyset(&set); //清空信号集
@@ -247,7 +244,7 @@ static void ngx_worker_process_init(int inum)
     //将空的信号集设置为新的屏蔽信号集
     if(sigprocmask(SIG_SETMASK,&set,NULL) == -1) //原来是屏蔽那10个信号【防止fork()期间收到信号导致混乱】，现在不再屏蔽任何信号【接收任何信号】
     {
-        ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_worker_process_init()中sigprocmask()失败!");
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_worker_process_init()中sigprocmask()失败!");
     }
 
 

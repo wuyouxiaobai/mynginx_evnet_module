@@ -1,4 +1,4 @@
-#include "my_global.h"
+#include "my_server.h"
 
 
 
@@ -7,7 +7,7 @@ namespace WYXB
 // 处理网络事件和定时器事件，按照nginx引入同名函数
 // 子进程反复调用，查看自己管理的epoll事件是否有发生的变化
 // 这是nginxs的核心处理函数，处理惊群
-void ngx_process_events_and_timers()
+void Server::ngx_process_events_and_timers()
 {
     g_socket.ngx_epoll_process_events(5);
 

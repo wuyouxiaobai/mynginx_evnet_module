@@ -298,7 +298,7 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
 
     // 最终提交
     m_recyconnectionList.push_back(p_Conn);
-    ngx_log_stderr(0, "Recy queue size: %zu", m_recyconnectionList.size());
+    Logger::ngx_log_stderr(0, "Recy queue size: %zu", m_recyconnectionList.size());
 
 
 }

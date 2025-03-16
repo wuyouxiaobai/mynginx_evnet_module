@@ -1,13 +1,13 @@
-#include "stddef.h"
-#include "my_slogic.h"
-#include "my_threadpool.h"
-#include <signal.h> 
-#include <string.h>
-#include "my_global.h"
-#include "my_macro.h"
-#include "my_conf.h"
-#include "my_func.h"
-#include "my_crc32.h"
+// #include <stddef.h>
+// #include "my_slogic.h"
+// #include "my_threadpool.h"
+// #include <signal.h> 
+// #include <string.h>
+// #include "my_global.h"
+// #include "my_macro.h"
+// #include "my_conf.h"
+// #include "my_func.h"
+// #include "my_crc32.h"
 
 namespace WYXB
 {
@@ -72,22 +72,22 @@ int main(int argc, char*const *argv)
     WYXB::g_os_argv = (char**)argv; //保存原始命令行参数数组
     
     //全局变量必要初始化
-    WYXB::my_log.fd = -1; //-1：表示日志文件尚未打开；因为后边ngx_log_stderr要用所以这里先给-1
+    // WYXB::my_log.fd = -1; //-1：表示日志文件尚未打开；因为后边ngx_log_stderr要用所以这里先给-1
     WYXB::ngx_process = NGX_PROCESS_MASTER; //本进程类型：主进程
     WYXB::ngx_reap = 0; //标记子进程状态变化
     
     WYXB::MyConf* myconf = WYXB::MyConf::getInstance(); //配置文件对象
     if(myconf->LoadConf("nginx.conf") == false)//把配置文件内容载入到内存
     {
-        WYXB::ngx_log_init();    //初始化日志
-        WYXB::ngx_log_stderr(0,"配置文件[%s]载入失败，退出!","nginx.conf");
+        WYXB::Logger::ngx_log_init();    //初始化日志
+        WYXB::Logger::ngx_log_stderr(0,"配置文件[%s]载入失败，退出!","nginx.conf");
         //exit(1);终止进程，在main中出现和return效果一样 ,exit(0)表示程序正常, exit(1)/exit(-1)表示程序异常退出，exit(2)表示表示系统找不到指定的文件
         exitcode = 2; //标记找不到文件
         goto lblexit;
     }
     // WYXB::CMemory::getInstance();
     // WYXB::CRC32::getInstance();
-    WYXB::ngx_log_init();             //日志初始化(创建/打开日志文件)，这个需要配置项，所以必须放配置文件载入的后边；     
+    WYXB::Logger::ngx_log_init();             //日志初始化(创建/打开日志文件)，这个需要配置项，所以必须放配置文件载入的后边；     
     
     if(WYXB::ngx_init_signals() != 0) //信号初始化
     {
@@ -127,7 +127,7 @@ int main(int argc, char*const *argv)
 lblexit:
     //(5)该释放的资源要释放掉
     if(WYXB::ngx_process == NGX_PROCESS_MASTER)
-        WYXB::ngx_log_stderr(0,"程序退出，再见了!");
+        WYXB::Logger::ngx_log_stderr(0,"程序退出，再见了!");
     WYXB::freeresource();  //一系列的main返回前的释放动作函数
     //printf("程序退出，再见!\n");    
     return exitcode;
@@ -145,12 +145,13 @@ void freeresource()
         gp_envmem = NULL;
     }
 
-    //(2)关闭日志文件
-    if(WYXB::my_log.fd != STDERR_FILENO && WYXB::my_log.fd != -1)  
-    {        
-        close(WYXB::my_log.fd); //不用判断结果了
-        WYXB::my_log.fd = -1; //标记下，防止被再次close吧        
-    }
+    Logger::ngx_log_close();
+    // //(2)关闭日志文件
+    // if(WYXB::my_log.fd != STDERR_FILENO && WYXB::my_log.fd != -1)  
+    // {        
+    //     close(WYXB::my_log.fd); //不用判断结果了
+    //     WYXB::my_log.fd = -1; //标记下，防止被再次close吧        
+    // }
 }
 
 }

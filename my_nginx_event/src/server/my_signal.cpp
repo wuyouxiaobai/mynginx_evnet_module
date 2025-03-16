@@ -1,38 +1,38 @@
 #include <signal.h> 
 #include <string.h>
-#include "my_func.h"
-#include "my_macro.h"
-#include "my_global.h"
+// #include "my_func.h"
+// #include "my_macro.h"
+// #include "my_global.h"
 #include <errno.h>
 #include <wait.h>
+#include "my_server.h"
 
 
 namespace WYXB
 {
-typedef struct
-{
-    int signo; // 信号对应数字编号
-    const char* signame; // 信号名称
+// typedef struct
+// {
+//     int signo; // 信号对应数字编号
+//     const char* signame; // 信号名称
     
-    // 信号处理函数，函数参数和返回值固定，函数体由我们自己实现
-    // 定义一个函数指针
-    void (*handler)(int signo, siginfo_t* siginfo, void* ucontext);
-} ngx_signal_t;
+//     // 信号处理函数，函数参数和返回值固定，函数体由我们自己实现
+//     // 定义一个函数指针
+//     void (*handler)(int signo, siginfo_t* siginfo, void* ucontext);
+// } ngx_signal_t;
 
-// 声明信号处理函数
-static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext); //static表示该函数只在当前文件内可见
-static void ngx_process_get_status(void); //获取子进程的结束状态，防止单独kill子进程时子进程变成僵尸进程
+
+// void ngx_process_get_status(void); //获取子进程的结束状态，防止单独kill子进程时子进程变成僵尸进程
 
 //数组 ，定义本系统处理的各种信号，我们取一小部分nginx中的信号，并没有全部搬移到这里，日后若有需要根据具体情况再增加
 //在实际商业代码中，你能想到的要处理的信号，都弄进来
-ngx_signal_t signals[] = {
+ngx_signal_t Server::signals[] = {
     // signo, signame, handler
-    { SIGHUP, "SIGHUP", ngx_signal_handler }, //终端断开信号，对于守护进程常用于reload重载配置文件通知--标识1 
-    { SIGINT, "SIGINT", ngx_signal_handler }, //中断信号，对于用户终端常用于退出程序通知--标识2 
-    { SIGTERM, "SIGTERM", ngx_signal_handler }, //终止信号，对于kill命令常用于杀死进程通知--标识15 
-    { SIGCHLD, "SIGCHLD", ngx_signal_handler }, //子进程结束信号，对于父进程常用于回收僵尸进程通知--标识17 
-    { SIGQUIT, "SIGQUIT", ngx_signal_handler }, //退出信号，对于用户终端常用于退出程序通知--标识3 
-    { SIGIO, "SIGIO", ngx_signal_handler }, //异步IO信号，对于网络编程常用于通知事件发生--标识29 
+    { SIGHUP, "SIGHUP", static_ngx_signal_handler }, //终端断开信号，对于守护进程常用于reload重载配置文件通知--标识1 
+    { SIGINT, "SIGINT", static_ngx_signal_handler }, //中断信号，对于用户终端常用于退出程序通知--标识2 
+    { SIGTERM, "SIGTERM", static_ngx_signal_handler }, //终止信号，对于kill命令常用于杀死进程通知--标识15 
+    { SIGCHLD, "SIGCHLD", static_ngx_signal_handler }, //子进程结束信号，对于父进程常用于回收僵尸进程通知--标识17 
+    { SIGQUIT, "SIGQUIT", static_ngx_signal_handler }, //退出信号，对于用户终端常用于退出程序通知--标识3 
+    { SIGIO, "SIGIO", static_ngx_signal_handler }, //异步IO信号，对于网络编程常用于通知事件发生--标识29 
     { SIGSYS, "SIGSYS, SIG_IGN", NULL}, //忽略这个信号，SIGSYS表示收到了一个无效系统调用，如果我们不忽略，进程会被操作系统杀死，--标识31
     //...日后根据需要再继续增加
     { 0, NULL, NULL } //数组结束标志
@@ -40,7 +40,7 @@ ngx_signal_t signals[] = {
     
 // 初始化信号的函数，用于注册信号处理函数
 // 返回值：成功返回0，失败返回-1
-int ngx_init_signals()
+int Server::ngx_init_signals()
 {
     ngx_signal_t *sig; // 信号数组指针
     struct sigaction sa; // 信号处理结构体
@@ -72,12 +72,12 @@ int ngx_init_signals()
                                                      //参数2：主要就是那个信号处理函数以及执行信号处理函数时候要屏蔽的信号等等内容
                                                       //参数3：返回以往的对信号的处理方式【跟sigprocmask()函数边的第三个参数是的】，跟参数2同一个类型，我们这里不需要这个东西，所以直接设置为NULL；
         {
-            ngx_log_error_core(NGX_LOG_EMERG,errno,"sigaction(%s) failed",sig->signame); //显示到日志文件中去的 
+            Logger::ngx_log_error_core(NGX_LOG_EMERG,errno,"sigaction(%s) failed",sig->signame); //显示到日志文件中去的 
             return -1; //有失败就直接返回
         }
         else
         {
-            //ngx_log_error_core(NGX_LOG_EMERG,errno,"sigaction(%s) succed!",sig->signame);     //成功不用写日志 
+            //Logger::ngx_log_error_core(NGX_LOG_EMERG,errno,"sigaction(%s) succed!",sig->signame);     //成功不用写日志 
             //ngx_log_stderr(0,"sigaction(%s) succed!",sig->signame); //直接往屏幕上打印看看 ，不需要时可以去掉
         }
     }  
@@ -131,12 +131,12 @@ int ngx_init_signals()
 //     // 记录日志
 //     if(siginfo && siginfo->si_pid)
 //     {
-//         ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received from %P%s", signo, sig->signame, siginfo->si_pid, action); 
+//         Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received from %P%s", signo, sig->signame, siginfo->si_pid, action); 
     
 //     }
 //     else
 //     {
-//         ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received %s",signo, sig->signame, action);//没有发送该信号的进程id，所以不显示发送该信号的进程id
+//         Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"signal %d (%s) received %s",signo, sig->signame, action);//没有发送该信号的进程id，所以不显示发送该信号的进程id
 //     }
 
 //     //.......其他需要扩展的将来再处理；
@@ -148,7 +148,7 @@ int ngx_init_signals()
 //     } 
 // }
 
-static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)  
+void Server::ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)  
 {  
     ngx_signal_t *sig; // 信号数组指针  
     char *action; // 动作字符串，用于记录日志  
@@ -204,11 +204,11 @@ static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
     // 记录日志  
     if (siginfo && siginfo->si_pid)  
     {  
-        ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received from %P %s", signo, sig->signame, siginfo->si_pid, action);  
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received from %P %s", signo, sig->signame, siginfo->si_pid, action);  
     }  
     else  
     {  
-        ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received %s", signo, sig->signame, action);  
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received %s", signo, sig->signame, action);  
     }  
 
     // 处理子进程状态变化  
@@ -220,7 +220,7 @@ static void ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
 
 
 // 获取子进程的结束状态，防止单独kill子进程时子进程变成僵尸进程
-static void ngx_process_get_status(void)
+void Server::ngx_process_get_status(void)
 {
     pid_t pid;
     int status;
@@ -257,10 +257,10 @@ static void ngx_process_get_status(void)
             
             if(err == ECHILD)
             {
-                ngx_log_error_core(NGX_LOG_ALERT,err,"waitpid() failed！");
+                Logger::ngx_log_error_core(NGX_LOG_ALERT,err,"waitpid() failed！");
                 return;
             }
-            ngx_log_error_core(NGX_LOG_ALERT,err,"waitpid() failed!");
+            Logger::ngx_log_error_core(NGX_LOG_ALERT,err,"waitpid() failed!");
             return;
             
         
@@ -270,12 +270,12 @@ static void ngx_process_get_status(void)
         one = 1; //标记信号正常处理过一次
         if(WTERMSIG(status)) //WTERMSIG(status) 是一个用于提取子进程终止信号编号的宏，常用于分析子进程的退出状态。
         {
-            ngx_log_error_core(NGX_LOG_ALERT,0,"pid = %P exited on signal %d!",pid,WTERMSIG(status)); //获取使子进程终止的信号编号
+            Logger::ngx_log_error_core(NGX_LOG_ALERT,0,"pid = %P exited on signal %d!",pid,WTERMSIG(status)); //获取使子进程终止的信号编号
             
         }
         else
         {
-            ngx_log_error_core(NGX_LOG_NOTICE,0,"pid = %P exited with code %d!",pid,WEXITSTATUS(status)); //WEXITSTATUS()获取子进程传递给exit或者_exit参数的低八位
+            Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"pid = %P exited with code %d!",pid,WEXITSTATUS(status)); //WEXITSTATUS()获取子进程传递给exit或者_exit参数的低八位
         }
     }
     return;

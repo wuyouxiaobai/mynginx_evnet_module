@@ -5,6 +5,11 @@
 
 namespace WYXB
 {
+typedef struct myConfItem_
+{
+    char ItemName[50];
+    char ItemContent[500];
+}myConfItem;
 
 class MyConf
 {

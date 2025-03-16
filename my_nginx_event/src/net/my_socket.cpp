@@ -35,7 +35,7 @@ CSocket::CSocket()
 
     // 和网络通信相关的变量
     m_iLenMsgHeader = sizeof(STRUC_MSG_HEADER); // 消息头的长度
-    m_iLenPkgHeader = sizeof(COMM_PKG_HEADER); // 包头的长度
+    // m_iLenPkgHeader = sizeof(COMM_PKG_HEADER); // 包头的长度
 
     // 各种队列相关
     m_iSendMsgQueueCount = 0; // 发送消息队列大小
@@ -120,14 +120,14 @@ lpngx_listening_t CSocket::ngx_open_listening_sockets()
     isock = socket(AF_INET, SOCK_STREAM, 0); // 创建socket
     if(isock == -1)
     {
-        ngx_log_stderr(errno, "CSocket::Initialize()中socket()失败.");
+        Logger::ngx_log_stderr(errno, "CSocket::Initialize()中socket()失败.");
         return nullptr;
     }
 
     int reuseaddr = 1; 
     if(setsockopt(isock,SOL_SOCKET,SO_REUSEADDR,(const void*)&reuseaddr, sizeof(reuseaddr)) == -1)
     {
-        ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEADDR)失败.");
+        Logger::ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEADDR)失败.");
         return nullptr;
     }
 
@@ -135,14 +135,14 @@ lpngx_listening_t CSocket::ngx_open_listening_sockets()
     int reuseport = 1;
     if(setsockopt(isock, SOL_SOCKET, SO_REUSEPORT,(const void*)&reuseport, sizeof(int))==-1)
     {
-        ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEPORT)失败.");
+        Logger::ngx_log_stderr(errno,"CSocket::Initialize()中setsockopt(SO_REUSEPORT)失败.");
     }
 
 
     //设置为非阻塞
     if(setnonblocking(isock) == false)
     {
-        ngx_log_stderr(errno,"CSocket::Initialize()中setnonblocking()失败.");
+        Logger::ngx_log_stderr(errno,"CSocket::Initialize()中setnonblocking()失败.");
         close(isock);
         return nullptr;
     
@@ -158,7 +158,7 @@ lpngx_listening_t CSocket::ngx_open_listening_sockets()
     //绑定服务器地址结构
     if(bind(isock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1)
     {
-        ngx_log_stderr(errno,"CSocket::Initialize()中bind()失败.");
+        Logger::ngx_log_stderr(errno,"CSocket::Initialize()中bind()失败.");
         close(isock);
         return nullptr;
     }
@@ -166,7 +166,7 @@ lpngx_listening_t CSocket::ngx_open_listening_sockets()
     // 监听端口
     if(listen(isock, NGX_LISTEN_BACKLOG) == -1)
     {
-        ngx_log_stderr(errno,"CSocket::Initialize()中listen()失败.");
+        Logger::ngx_log_stderr(errno,"CSocket::Initialize()中listen()失败.");
         close(isock);
         return nullptr;
     }
@@ -176,7 +176,7 @@ lpngx_listening_t CSocket::ngx_open_listening_sockets()
     // memset(p_listensocketitem, 0, sizeof(ngx_listening_s));
     p_listensocketitem->port = iport;
     p_listensocketitem->fd = isock;
-    ngx_log_error_core(NGX_LOG_INFO, 0, "监听端口%d成功",iport);
+    Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "监听端口%d成功",iport);
     m_ListenSocketList.push_back(p_listensocketitem);
 
 
@@ -204,7 +204,7 @@ bool CSocket::setnonblocking(int sockfd)
 //子进程中执行的初始化函数
 bool CSocket::Initialize_subproc()
 {
-    ngx_log_stderr(0,"Initialize_subproc");
+    Logger::ngx_log_stderr(0,"Initialize_subproc");
     //     //发消息互斥量初始化
     // if(pthread_mutex_init(&m_sendMessageQueueMutex, NULL)  != 0)
     // {        
@@ -232,7 +232,7 @@ bool CSocket::Initialize_subproc()
 
     if(sem_init(&m_semEventSendQueue,0,0) == -1)
     {
-        ngx_log_stderr(0,"CSocket::Initialize_subproc()中sem_init(&m_semEventSendQueue,0,0)失败.");
+        Logger::ngx_log_stderr(0,"CSocket::Initialize_subproc()中sem_init(&m_semEventSendQueue,0,0)失败.");
         return false;
     }
 
@@ -306,7 +306,7 @@ void CSocket::Shotdown_subproc()
 {
     // 1. 发送信号量通知线程退出
     if (sem_post(&m_semEventSendQueue) == -1) {
-        ngx_log_stderr(0, "CSocket::Shutdown_subproc()中sem_post失败: errno=%d", errno);
+        Logger::ngx_log_stderr(0, "CSocket::Shutdown_subproc()中sem_post失败: errno=%d", errno);
     }
 
     // 2. 安全等待所有线程退出（RAII 管理）
@@ -315,7 +315,7 @@ void CSocket::Shotdown_subproc()
             try {
                 pItem->_Thread.join();
             } catch (const std::exception& e) {
-                ngx_log_stderr(0, "线程等待失败: %s", e.what());
+                Logger::ngx_log_stderr(0, "线程等待失败: %s", e.what());
             }
         }
     }
@@ -357,7 +357,7 @@ void CSocket::ngx_close_listening_sockets()
     {  
         //ngx_log_stderr(0,"端口是%d,socketid是%d.",m_ListenSocketList[i]->port,m_ListenSocketList[i]->fd);
         close(m_ListenSocketList[i]->fd);
-        ngx_log_error_core(NGX_LOG_INFO, 0,"关闭监听端口%d!",m_ListenSocketList[i]->port); //显示一些信息到日志中
+        Logger::ngx_log_error_core(NGX_LOG_INFO, 0,"关闭监听端口%d!",m_ListenSocketList[i]->port); //显示一些信息到日志中
     }//end for(int i = 0; i < m_ListenPortCount; i++)
     return;
 }
@@ -370,13 +370,13 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
     if (m_MsgSendQueue.size() > 50000) {
         ++m_iDiscardSendPkgCount;
         // 可以记录日志，提示队列已满并丢弃了消息
-        ngx_log_stderr(0, "CSocket::msgSend() 发送队列已满，丢弃了一条消息.");
+        Logger::ngx_log_stderr(0, "CSocket::msgSend() 发送队列已满，丢弃了一条消息.");
         return;
     }
 
     // 检查发送计数
     if (pConn->iSendCount > 400) {
-        ngx_log_stderr(0, "CSocket::msgSend()中发现某用户%d积压了大量待发送数据包，切断与他的连接！", pConn->fd);   
+        Logger::ngx_log_stderr(0, "CSocket::msgSend()中发现某用户%d积压了大量待发送数据包，切断与他的连接！", pConn->fd);   
         ++m_iDiscardSendPkgCount;
 
         // 关闭连接
@@ -404,7 +404,7 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 
     // 发送信号量通知发送线程
     if (sem_post(&m_semEventSendQueue) == -1) {
-        ngx_log_stderr(0, "CSocket::msgSend()中sem_post(&m_semEventSendQueue)失败: %s", std::strerror(errno));
+        Logger::ngx_log_stderr(0, "CSocket::msgSend()中sem_post(&m_semEventSendQueue)失败: %s", std::strerror(errno));
     }
 
 
@@ -511,18 +511,18 @@ void CSocket::printTDInfo()
         m_lastprintTime = currtime;
         int tmpoLUC = m_onlineUserCount;
         int tmpsmqc = m_iSendMsgQueueCount;
-        ngx_log_stderr(0,"------------------------------------begin--------------------------------------");
-        ngx_log_stderr(0,"当前在线人数/总人数(%d/%d)。",tmpoLUC,m_worker_connections);        
-        ngx_log_stderr(0,"连接池中空闲连接/总连接/要释放的连接(%d/%d/%d)。",m_freeConnectionList.size(),m_connectionList.size(),m_recyconnectionList.size());
-        ngx_log_stderr(0,"当前时间队列大小(%d)。",m_timeQueuemap.size());        
-        ngx_log_stderr(0,"当前收消息队列/发消息队列大小分别为(%d/%d)，丢弃的待发送数据包数量为%d。",tmprmqc,tmpsmqc,m_iDiscardSendPkgCount);   
+        Logger::ngx_log_stderr(0,"------------------------------------begin--------------------------------------");
+        Logger::ngx_log_stderr(0,"当前在线人数/总人数(%d/%d)。",tmpoLUC,m_worker_connections);        
+        Logger::ngx_log_stderr(0,"连接池中空闲连接/总连接/要释放的连接(%d/%d/%d)。",m_freeConnectionList.size(),m_connectionList.size(),m_recyconnectionList.size());
+        Logger::ngx_log_stderr(0,"当前时间队列大小(%d)。",m_timeQueuemap.size());        
+        Logger::ngx_log_stderr(0,"当前收消息队列/发消息队列大小分别为(%d/%d)，丢弃的待发送数据包数量为%d。",tmprmqc,tmpsmqc,m_iDiscardSendPkgCount);   
 
         if(tmprmqc > 100000)
         {
             // 接收队列过大，提醒一下
-            ngx_log_stderr(0,"接收队列条目数量过大(%d)，要考虑限速或者增加处理线程数量了！！！！！！",tmprmqc);
+            Logger::ngx_log_stderr(0,"接收队列条目数量过大(%d)，要考虑限速或者增加处理线程数量了！！！！！！",tmprmqc);
         }
-        ngx_log_stderr(0,"------------------------------------end--------------------------------------");
+        Logger::ngx_log_stderr(0,"------------------------------------end--------------------------------------");
 
     }
 
@@ -548,7 +548,7 @@ int CSocket::ngx_epoll_init()// epoll初始化
     m_epollhandle = epoll_create(m_worker_connections); //最大连接数为m_worker_connections
     if(m_epollhandle == -1)
     {
-        ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中epoll_create()失败.");
+        Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中epoll_create()失败.");
         exit(2); //这是致命问题了，直接退，资源由系统释放吧，这里不刻意释放了，比较麻烦
     }
 
@@ -567,7 +567,7 @@ int CSocket::ngx_epoll_init()// epoll初始化
     if(pConn == NULL)
     {
         //分配连接失败，致命问题了，直接退出吧
-        ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中ngx_get_connection()分配连接失败.");
+        Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中ngx_get_connection()分配连接失败.");
         exit(2);
     }
     pConn->listening = listening;
@@ -639,7 +639,7 @@ int CSocket::ngx_epoll_oper_event(int fd,               //句柄，一个socket
     ev.data.ptr = pConn;
     if(epoll_ctl(m_epollhandle,eventtype,fd,&ev) == -1)
     {
-        ngx_log_stderr(errno,"CSocekt::ngx_epoll_oper_event()中epoll_ctl(%d,%ud,%ud,%d)失败.",fd,eventtype,flag,bcaction);    
+        Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_oper_event()中epoll_ctl(%d,%ud,%ud,%d)失败.",fd,eventtype,flag,bcaction);    
         return -1;
     }
     return 1;
@@ -667,12 +667,12 @@ int CSocket::ngx_epoll_process_events(int timer)
         if(errno == EINTR)
         {
             // 被信号打断，比如用kill -1 pid测试
-            ngx_log_error_core(NGX_LOG_INFO,errno,"CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断.");
+            Logger::ngx_log_error_core(NGX_LOG_INFO,errno,"CSocekt::ngx_epoll_process_events()中epoll_wait()被信号打断.");
             return 1;
         }
         else
         {
-            ngx_log_error_core(NGX_LOG_ALERT,errno,"CSocekt::ngx_epoll_process_events()中epoll_wait()失败!"); 
+            Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"CSocekt::ngx_epoll_process_events()中epoll_wait()失败!"); 
             return 0;  //非正常返回 
         }
     }
@@ -684,7 +684,7 @@ int CSocket::ngx_epoll_process_events(int timer)
             return 1; //阻塞时间到
         }
         // 无限等待，但没有返回任何事件就退出阻塞，认为有问题
-        ngx_log_error_core(NGX_LOG_ALERT,0,"CSocekt::ngx_epoll_process_events()中epoll_wait()没超时却没返回任何事件!"); 
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,0,"CSocekt::ngx_epoll_process_events()中epoll_wait()没超时却没返回任何事件!"); 
         return 0; //非正常返回 
     }
 
@@ -704,16 +704,16 @@ int CSocket::ngx_epoll_process_events(int timer)
         if(revents & EPOLLIN) //可读事件
         {
             // 读事件发生，处理读事件
-            ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生.");
+            Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生.");
             if(revents & (EPOLLHUP|EPOLLERR|EPOLLRDHUP)) // 连接断开事件
             {
                 // --pConn->iThrowsendCount; // 连接断开
-                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，连接断开.");
+                Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，连接断开.");
                 zdClosesocketProc(pConn);
             }
             else
             {
-                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件.");
+                Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件.");
                 pConn->rhandler(pConn); 
             }
 
@@ -722,16 +722,16 @@ int CSocket::ngx_epoll_process_events(int timer)
         if(revents & EPOLLOUT) //可写事件
         {
             // 写事件发生，处理写事件
-            ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生.");
+            Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生.");
             if(revents & (EPOLLHUP|EPOLLERR|EPOLLRDHUP)) // 连接断开事件
             {
                 // --pConn->iThrowsendCount; // 连接断开
-                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，连接断开.");
+                Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，连接断开.");
                 zdClosesocketProc(pConn);
             }
             else
             {
-                ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，正常写事件.");
+                Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，正常写事件.");
                 pConn->whandler(pConn); //如果有数据没有发送完毕，由系统驱动来发送
             }
         }
@@ -763,7 +763,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
     while (g_stopEvent == 0) {
         // 等待信号量
         if (sem_wait(&pSocket->m_semEventSendQueue) == -1 && errno != EINTR) {
-            ngx_log_stderr(errno, "sem_wait失败");
+            Logger::ngx_log_stderr(errno, "sem_wait失败");
         }
 
         if (g_stopEvent != 0) break;
@@ -808,7 +808,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                         tmpbuf.retrieveAll();
                         // 仅在完整发送时检查400响应
                         if (payload_str == "HTTP/1.1 400 Bad Request\r\n\r\n") {
-                            ngx_log_stderr(0, "发送400错误后关闭连接 fd=%d", pConn->fd);
+                            Logger::ngx_log_stderr(0, "发送400错误后关闭连接 fd=%d", pConn->fd);
                             pSocket->zdClosesocketProc(pConn);
                         }
                     } else {

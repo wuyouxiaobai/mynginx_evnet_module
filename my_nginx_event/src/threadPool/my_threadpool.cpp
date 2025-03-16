@@ -42,7 +42,7 @@ bool CThreadPool::Create(int threadNum)
             m_threadVector.push_back(std::move(pItem));
         }
     } catch (const std::exception& e) {
-        ngx_log_stderr(0, "线程创建失败: %s", e.what());
+        Logger::ngx_log_stderr(0, "线程创建失败: %s", e.what());
         return false;
     }
 
@@ -104,14 +104,14 @@ void CThreadPool::StopAll() // 使线程池中的所有线程停止并退出
             try {
                 pItem->_Thread.join();  // 安全等待线程结束
             } catch (const std::exception& e) {
-                ngx_log_stderr(0, "线程等待异常: %s", e.what());
+                Logger::ngx_log_stderr(0, "线程等待异常: %s", e.what());
             }
         }
     }
 
     m_threadVector.clear();  // 自动释放所有 ThreadItem
 
-    ngx_log_stderr(0, "CThreadPool::StopAll() 成功，线程池已关闭!");
+    Logger::ngx_log_stderr(0, "CThreadPool::StopAll() 成功，线程池已关闭!");
 
     // std::vector<ThreadItem*>::iterator iter;
 	// for(iter = m_threadVector.begin(); iter != m_threadVector.end(); iter++)
@@ -157,7 +157,7 @@ void CThreadPool::Call() //唤醒线程
         if(now - m_iLastEmgTime > 10)
         {
             m_iLastEmgTime = now;
-            ngx_log_stderr(0,"CThreadPool::Call()中发现线程池中当前空闲线程数量为0，要考虑扩容线程池了!");
+            Logger::ngx_log_stderr(0,"CThreadPool::Call()中发现线程池中当前空闲线程数量为0，要考虑扩容线程池了!");
         }
     }
 
@@ -170,7 +170,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
 
     const auto pThread = static_cast<ThreadItem*>(threadData);
     if (pThread->_pThis.expired()) {
-        ngx_log_stderr(0, "CThreadPool::ThreadFunc() 中发现 _pThis 已过期!");
+        Logger::ngx_log_stderr(0, "CThreadPool::ThreadFunc() 中发现 _pThis 已过期!");
         return nullptr;
     }
     

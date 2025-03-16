@@ -29,7 +29,7 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
             port = ntohs(addr6->sin6_port);
         }
     
-        ngx_log_stderr(errcode, "%s [%s]:%d (family:%d)", 
+        Logger::ngx_log_stderr(errcode, "%s [%s]:%d (family:%d)", 
                       msg, ip, port, pConn->s_sockaddr.sa_family);
     };
 
@@ -152,7 +152,7 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
     // 消息头验证
     // 确保连接有效性和数据完整性检查
     if (!pConn || pConn->fd == -1 || pConn->psendbuf.readableBytes() == 0 || pConn->iCurrsequence != header.iCurrsequence) {
-        ngx_log_stderr(0, "非法连接或空发送缓冲区");
+        Logger::ngx_log_stderr(0, "非法连接或空发送缓冲区");
         return;
     }
 
@@ -182,7 +182,7 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
                 if(ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD, EPOLLOUT, 1, pConn.get()) == -1) // 覆盖epoll中的写事件
                 {
                     //有这情况发生？这可比较麻烦，不过先do nothing
-                    ngx_log_stderr(errno,"CSocekt::ngx_write_request_handler()中ngx_epoll_oper_event()失败。");
+                    Logger::ngx_log_stderr(errno,"CSocekt::ngx_write_request_handler()中ngx_epoll_oper_event()失败。");
                 }
                 break;
             }
@@ -200,12 +200,12 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
                 // 注册可写事件继续发送
                 ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD,
                                 EPOLLOUT, 0, pConn.get());
-                ngx_log_stderr(0, "发送缓冲区满，等待再次发送 fd=%d", pConn->fd);
+                Logger::ngx_log_stderr(0, "发送缓冲区满，等待再次发送 fd=%d", pConn->fd);
             } 
             else 
             {
                 // 严重错误立即关闭
-                ngx_log_stderr(errno, "发送失败，关闭连接 fd=%d", pConn->fd);
+                Logger::ngx_log_stderr(errno, "发送失败，关闭连接 fd=%d", pConn->fd);
                 zdClosesocketProc(pConn);
             }
             break;
@@ -213,7 +213,7 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
         else 
         {
             // 其他错误（如返回0）
-            ngx_log_stderr(0, "未知发送错误，关闭连接 fd=%d", pConn->fd);
+            Logger::ngx_log_stderr(0, "未知发送错误，关闭连接 fd=%d", pConn->fd);
             zdClosesocketProc(pConn);
             break;
         }
@@ -288,7 +288,7 @@ ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送�
         {
             // 收到某个信号，不认为出错
             // 仅打印日志
-            ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
+            Logger::ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
         }
         else
         {
