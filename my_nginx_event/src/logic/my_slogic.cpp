@@ -61,6 +61,18 @@ bool CLogicSocket::regist()
         }
     );
 
+    m_Router->registerCallback(  // 改用精确匹配方法
+        HttpRequest::Method::kGet,
+        "/hello",  // 静态路径
+        [](const HttpRequest& req, HttpResponse* resp) {
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setCloseConnection(false);
+            resp->addHeader("Keep-Alive", "timeout=5, max=100");  
+            resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
+            resp->setBody("hello world"); // 直接返回中文文本
+        }
+    );
+
     return true;
 }
 
@@ -187,7 +199,7 @@ void CLogicSocket::onRequest(lpngx_connection_t conn, const HttpRequest &req)
 {
     const std::string &connection = req.getHeader("Connection");
     bool close = ((connection == "close") ||
-                  (req.getVersion() == "HTTP/1.0" && connection != "Keep-Alive"));
+                  (req.getVersion() == "HTTP/1.1" && connection != "Keep-Alive"));
     HttpResponse response(close);
 
     // 根据请求报文信息来封装响应报文对象

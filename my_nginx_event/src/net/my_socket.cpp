@@ -802,10 +802,10 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                 tmpbuf.append(payload_str.c_str(), payload_str.size());
                 // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
                 ssize_t sendsize = pSocket->sendproc(pConn, tmpbuf);
-
+                Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ServerSendQueueThread tmpbuf is: %s", tmpbuf.peek());
                 // 结果处理
                 if (sendsize > 0) {
-                    if (sendsize == pConn->psendbuf.readableBytes()) {
+                    if (sendsize == tmpbuf.readableBytes()) {
                         tmpbuf.retrieveAll();
                         // 仅在完整发送时检查400响应
                         if (payload_str == "HTTP/1.1 400 Bad Request\r\n\r\n") {

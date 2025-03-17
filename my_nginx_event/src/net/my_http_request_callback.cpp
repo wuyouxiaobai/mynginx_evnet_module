@@ -173,7 +173,7 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
         // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
         ssize_t sendsize = sendproc(pConn, tmpbuf);
         // ssize_t sendsize = sendproc(pConn, pConn->psendbuf);
-
+        Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ngx_http_write_response_handler 发送数据长度：%d, 发送数据: %s", sendsize, tmpbuf.peek());
         if (sendsize > 0) {
             tmpbuf.retrieve(sendsize);
             // 检查是否发送完成
@@ -209,12 +209,12 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
                 Logger::ngx_log_stderr(errno, "发送失败，关闭连接 fd=%d", pConn->fd);
                 zdClosesocketProc(pConn);
             }
-            break;
+            break;  
         }
         else 
         {
             // 其他错误（如返回0）
-            Logger::ngx_log_stderr(0, "未知发送错误，关闭连接 fd=%d", pConn->fd);
+            Logger::ngx_log_stderr(0, "未知错误 断开连接 fd=%d", pConn->fd);
             zdClosesocketProc(pConn);
             break;
         }
@@ -278,7 +278,7 @@ ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送�
         }
         if(n == 0)
         {
-            return 0; // 对方关闭连接
+            return 0; 
         }
         if(errno == EINTR) // 内核缓冲区满了
         {
@@ -294,6 +294,7 @@ ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送�
         else
         {
             // 出错，但是不断开socket，等待recv来统一处理断开，因为多线程时处理send和recv断开不容易
+            Logger::ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
             return -2;
         }
     }
