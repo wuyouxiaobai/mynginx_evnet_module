@@ -60,7 +60,7 @@ CSocket::~CSocket()
     // {
     //     delete(*pos);
     // }
-    ngx_close_listening_sockets();
+    // ngx_close_listening_sockets();
     m_ListenSocketList.clear();
     
 }
@@ -352,15 +352,15 @@ void CSocket::clearMsgSendQueue()
 // 关闭Socket
 void CSocket::ngx_close_listening_sockets()
 {
-    MyConf* config = MyConf::getInstance();
-    int WorkerProcesses = config->GetIntDefault("WorkerProcesses", 1);
-    for(int i = 0; i < m_ListenPortCount; i++) //关闭多个套接字
-    {  
-        //ngx_log_stderr(0,"端口是%d,socketid是%d.",m_ListenSocketList[i]->port,m_ListenSocketList[i]->fd);
-        close(m_ListenSocketList[i]->fd);
-        Logger::ngx_log_error_core(NGX_LOG_INFO, 0,"关闭监听端口%d!",m_ListenSocketList[i]->port); //显示一些信息到日志中
-    }//end for(int i = 0; i < m_ListenPortCount; i++)
-    return;
+    // MyConf* config = MyConf::getInstance();
+    // int WorkerProcesses = config->GetIntDefault("WorkerProcesses", 1);
+    // for(int i = 0; i < m_ListenPortCount; i++) //关闭多个套接字
+    // {  
+    //     //ngx_log_stderr(0,"端口是%d,socketid是%d.",m_ListenSocketList[i]->port,m_ListenSocketList[i]->fd);
+    //     close(m_ListenSocketList[i]->fd);
+    //     Logger::ngx_log_error_core(NGX_LOG_INFO, 0,"关闭监听端口%d!",m_ListenSocketList[i]->port); //显示一些信息到日志中
+    // }//end for(int i = 0; i < m_ListenPortCount; i++)
+    // return;
 }
 
 // 将一个待发送消息写入发送队列中

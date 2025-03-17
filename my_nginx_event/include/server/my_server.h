@@ -1,3 +1,4 @@
+#pragma once
 #include <stddef.h>
 #include "my_slogic.h"
 #include "my_threadpool.h"
@@ -132,7 +133,7 @@ public:
     std::shared_ptr<CThreadPool> g_threadpool;
 
 //socket相关
-    std::shared_ptr<CLogicSocket> g_socket;
+    std::shared_ptr<CSocket> g_socket;
 
 };
 } // namespace WYXB

@@ -1,6 +1,7 @@
 #include "my_threadpool.h"
 #include <algorithm>
 #include <thread>
+#include "my_server.h"
 
 namespace WYXB
 {

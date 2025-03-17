@@ -16,7 +16,7 @@
 #include <functional>
 #include "Buffer.h"
 #include "my_logger.h"
-#include "my_server.h"
+
 
 
 #define NGX_LISTEN_BACKLOG 511 // 已完成连接队列，nginx给511，我们也先按照这个来：不懂这个数字的同学参考第五章第四节
@@ -35,6 +35,7 @@ namespace WYXB
 
 
 class CSocket;
+class Server;
 struct ngx_listening_s;
 struct ngx_connection_s;
 
@@ -68,6 +69,15 @@ struct ngx_listening_s {
     
     // 使用weak_ptr避免循环引用
     std::weak_ptr<ngx_connection_s> connection;  // 替换原始指针
+
+    ~ngx_listening_s()
+    {
+        if (fd != -1)
+        {
+            close(fd);
+            fd = -1;
+        }
+    }
     
 };
 

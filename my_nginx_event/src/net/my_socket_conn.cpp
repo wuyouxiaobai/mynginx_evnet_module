@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string.h>
 #include <algorithm>
-
+#include "my_server.h"
 
 namespace WYXB
 {
@@ -13,7 +13,14 @@ namespace WYXB
 
 // ----------------------- 创建连接 ----------
 ngx_connection_s::ngx_connection_s(): context_(std::make_shared<HttpContext>()){    /* iCurrsequence = 0;*/}
-ngx_connection_s::~ngx_connection_s(){}
+ngx_connection_s::~ngx_connection_s()
+{
+    if (fd != -1)
+    {
+        close(fd);
+        fd = -1;
+    }
+}
 
 // 分配出去一个连接的时候初始化一些内容，原来的内容放在ngx_get_connection
 void ngx_connection_s::GetOneToUse(int sockfd)

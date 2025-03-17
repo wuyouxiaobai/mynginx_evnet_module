@@ -7,9 +7,8 @@
 #include <my_memory.h>
 #include <list>
 #include <vector>
-#include "my_func.h"
 #include <unistd.h>
-#include "my_server.h"
+// #include "my_server.h"
 #include <deque>
 #include "my_logger.h"
 

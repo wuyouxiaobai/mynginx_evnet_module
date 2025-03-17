@@ -2,7 +2,7 @@
 #include "my_memory.h"
 #include "my_global.h"
 #include <unistd.h>
-
+#include "my_server.h"
 
 
 namespace WYXB

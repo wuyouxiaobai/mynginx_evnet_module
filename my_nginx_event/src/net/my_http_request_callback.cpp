@@ -5,6 +5,7 @@
 #include <cstring>
 #include "my_global.h"
 #include "my_http_context.h"
+#include "my_server.h"
 
 namespace WYXB
 {
