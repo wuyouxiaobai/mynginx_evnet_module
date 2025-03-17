@@ -9,6 +9,7 @@
 #include <iterator>
 #include <limits.h>
 #include <iostream>
+#include <unistd.h> 
 
 namespace WYXB
 {

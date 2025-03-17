@@ -15,19 +15,31 @@ namespace WYXB
 
 
 // 函数申明
-static void ngx_start_worker_processes(int processnums);
-static int ngx_spawn_process(int threadnums,const char *pprocname);
-static void ngx_worker_process_cycle(int inum,const char *pprocname);
-static void ngx_worker_process_init(int inum);
-static void ngx_reap_worker_processes();
-static void ngx_signal_worker_processes(int signo);
+// static void ngx_start_worker_processes(int processnums);
+// static int ngx_spawn_process(int threadnums,const char *pprocname);
+// static void ngx_worker_process_cycle(int inum,const char *pprocname);
+// static void ngx_worker_process_init(int inum);
+// static void ngx_reap_worker_processes();
+// static void ngx_signal_worker_processes(int signo);
 // 申明主进程
 static u_char master_process[] = "master process";
 
 
 // 主进程循环，创建worker子进程
-void Server::ngx_master_process_cycle()
+int Server::ngx_master_process_cycle()
 {
+    if(ngx_init_signals() != 0) //信号初始化
+    {
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_init_signals失败!");
+        return 1;
+    }
+    // if(Server::instance().g_socket->Initialize() == false)
+    // {
+    //     Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"Server::instance().g_socket->Initialize()失败!");
+    //     return 1;
+    // }
+
+
     sigset_t set;        //信号集
 
     sigemptyset(&set);   //清空信号集
@@ -68,7 +80,7 @@ void Server::ngx_master_process_cycle()
             strcat(title, g_os_argv[i]);
         }
         ngx_setproctitle(title); //设置进程标题
-        Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【master进程】启动并开始运行......!",title,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【master进程】启动并开始运行......!",title,ngx_pid.load()); //设置标题时顺便记录下来进程名，进程id等信息到日志
     }
     //首先我设置主进程标题---------end
 
@@ -105,10 +117,18 @@ void Server::ngx_master_process_cycle()
             }  
 
             sigsuspend(&set); // 阻塞在这里，等待信号的到来  
+
+            Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Master process %P recved signal stopevent %d .......", ngx_pid.load(), g_stopEvent.load());  
+            Server& server = instance();  
+            pid_t current_pid = getpid();  
+        
+        // 详细日志  
+            Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Mster process Server Instance Addr: %P, Current PID: %d",   
+               &server, current_pid);
         }  
     }
     
-    return;
+    return 0;
     
 }
 
@@ -170,7 +190,7 @@ int Server::ngx_spawn_process(int inum,const char *pprocname)
         Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_spawn_process()fork()产生子进程num=%d,procname=\"%s\"失败!",inum,pprocname);
         return -1;
     case 0: //子进程进入循环处理请求
-        ngx_parent = ngx_pid;
+        ngx_parent = ngx_pid.load();
         ngx_pid = getpid();
         ngx_worker_process_cycle(inum,pprocname); //所有子进程在该函数循环处理请求
     
@@ -189,6 +209,18 @@ int Server::ngx_spawn_process(int inum,const char *pprocname)
 //inum：进程编号【0开始】
 void Server::ngx_worker_process_cycle(int inum,const char *pprocname) 
 {
+    if(ngx_init_signals() != 0) //信号初始化
+    {
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"ngx_init_signals失败!");
+        exit(-1);
+    }
+    if(Server::instance().g_socket->Initialize() == false)
+    {
+        Logger::ngx_log_error_core(NGX_LOG_ALERT,errno,"Server::instance().g_socket->Initialize()失败!");
+        exit(-1);
+    }
+
+
     sigset_t empty_set;  
     sigemptyset(&empty_set); // 清空信号屏蔽集  
     if (sigprocmask(SIG_SETMASK, &empty_set, NULL) == -1) {  
@@ -202,7 +234,7 @@ void Server::ngx_worker_process_cycle(int inum,const char *pprocname)
     ngx_worker_process_init(inum);
 
     ngx_setproctitle(pprocname); //设置进程名
-    Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【worker进程】启动并开始运行......!",pprocname,ngx_pid); //设置标题时顺便记录下来进程名，进程id等信息到日志
+    Logger::ngx_log_error_core(NGX_LOG_NOTICE,0,"%s %P 【worker进程】启动并开始运行......!",pprocname,ngx_pid.load()); //设置标题时顺便记录下来进程名，进程id等信息到日志
 
     //测试代码，测试线程池的关闭
     //sleep(5); //休息5秒        
@@ -218,7 +250,7 @@ void Server::ngx_worker_process_cycle(int inum,const char *pprocname)
         // 检查退出标志  
         if (g_stopEvent)   
         {  
-            Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P is exiting gracefully...", ngx_pid);  
+            Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P is exiting gracefully...", ngx_pid.load());  
             break; // 跳出循环，准备退出  
         }  
         // 处理网络事件和定时器事件
@@ -248,6 +280,7 @@ void Server::ngx_worker_process_init(int inum)
     }
 
 
+Logger::ngx_log_error_core(NGX_LOG_INFO,errno,"创建线程池....");
 // 创建线程池 
     MyConf* config = MyConf::getInstance(); //初始化配置文件
     int tmpthreadnum = config->GetIntDefault("ProcMsgRecvWorkThreadCount", 5); // 处理接收消息线程池中线程的数量，默认为5
@@ -258,6 +291,8 @@ void Server::ngx_worker_process_init(int inum)
     }
     sleep(1);
 
+
+Logger::ngx_log_error_core(NGX_LOG_INFO,errno,"创建Queue队列线程....");
 // 创建ServerSendQueueThread、ServerRecyConnectionThread、ServerTimerQueueMonitorThread
     if(Server::instance().g_socket->Initialize_subproc() == false) // 初始化子进程
     {

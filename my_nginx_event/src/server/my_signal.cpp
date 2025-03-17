@@ -204,11 +204,13 @@ void Server::ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
     // 记录日志  
     if (siginfo && siginfo->si_pid)  
     {  
-        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received from %P %s", signo, sig->signame, siginfo->si_pid, action);  
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "process %P signal %d (%s) received from %P %s stopevent %d", ngx_pid.load(), signo, sig->signame, siginfo->si_pid, action, g_stopEvent.load());  
+
+
     }  
     else  
     {  
-        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "signal %d (%s) received %s", signo, sig->signame, action);  
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "process %P signal %d (%s) received %s stopevent %d", ngx_pid.load(), signo, sig->signame, action, g_stopEvent.load());  
     }  
 
     // 处理子进程状态变化  

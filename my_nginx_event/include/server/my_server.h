@@ -52,6 +52,12 @@ public:
 
     // 静态信号处理函数（符合普通函数指针类型）
     static void static_ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext) {
+        Server& server = instance();  
+        pid_t current_pid = getpid();  
+    
+    // 详细日志  
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0,"static_ngx_signal_handler Server Instance Addr: %P, Current PID: %d",   
+           &server, current_pid);
         instance().ngx_signal_handler(signo, siginfo, ucontext); // 调用实例的实际处理逻辑
     }
 
@@ -73,10 +79,10 @@ private:
 
 
 //进程本身相关的全局变量
-    pid_t ngx_pid; //当前进程
-    pid_t ngx_parent; //父进程
+    static std::atomic<int> ngx_pid; //当前进程
+    static std::atomic<int> ngx_parent; //父进程
     int ngx_process; //进程类型
-    int g_stopEvent;//进程退出事，退出：1 继续：0
+    static std::atomic<int> g_stopEvent;//进程退出事，退出：1 继续：0
     int ngx_terminate;//进程优雅退出：1 继续：0
     pid_t ngx_processes[NGX_MAX_PROCESSES]; // 定义一个固定大小的数组  
     int ngx_last_process;//工作进程数量
@@ -97,7 +103,7 @@ private:
     //子进程循环监听epoll消息相关函数
     void ngx_process_events_and_timers();
     // 主进程循环，创建worker子进程
-    void ngx_master_process_cycle();
+    int ngx_master_process_cycle();
     // 通知所有子进程退出  
     void ngx_signal_worker_processes(int signo);
     // 回收所有子进程  

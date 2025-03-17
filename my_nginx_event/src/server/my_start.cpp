@@ -2,6 +2,10 @@
 
 namespace WYXB
 {
+std::atomic<int> Server::g_stopEvent{0};
+std::atomic<int> Server::ngx_pid{-1}; //当前进程
+std::atomic<int> Server::ngx_parent{-1}; //父进程
+
 int Server::start(int argc, char*const *argv)
 {
     int exitcode = 0;           //退出代码，先给0表示正常退出
@@ -47,16 +51,16 @@ int Server::start(int argc, char*const *argv)
     // CRC32::getInstance();
     Logger::ngx_log_init();             //日志初始化(创建/打开日志文件)，这个需要配置项，所以必须放配置文件载入的后边；     
     
-    if(ngx_init_signals() != 0) //信号初始化
-    {
-        exitcode = 1;
-        goto lblexit;
-    }
-    if(Server::instance().g_socket->Initialize() == false)
-    {
-        exitcode = 1;
-        goto lblexit;
-    }
+    // if(ngx_init_signals() != 0) //信号初始化
+    // {
+    //     exitcode = 1;
+    //     goto lblexit;
+    // }
+    // if(Server::instance().g_socket->Initialize() == false)
+    // {
+    //     exitcode = 1;
+    //     goto lblexit;
+    // }
 
     ngx_init_setproctitle();    //把环境变量搬家
     

@@ -144,7 +144,7 @@ void Logger::ngx_log_error_core(int level, int err, const char *fmt, ...)
 
     p = ngx_cpymem(errstr, strcurrtime, strlen((const char*)strcurrtime));
     p = ngx_slprintf(p, last, " [%s] ", err_level[level]);
-    p = ngx_slprintf(p, last, "%P: ", Server::instance().ngx_pid); //  2019-01-08 20:50:15 [crit] 2037:
+    p = ngx_slprintf(p, last, "%P: ", Server::instance().ngx_pid.load()); //  2019-01-08 20:50:15 [crit] 2037:
 
     va_start(args, fmt);
     p = ngx_vslprintf(p, last, fmt, args); 

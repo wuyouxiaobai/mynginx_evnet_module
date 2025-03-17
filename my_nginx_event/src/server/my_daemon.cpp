@@ -23,7 +23,7 @@ int Server::ngx_daemon()
         return 1;
     
     }
-    ngx_parent = ngx_pid; // 记录父进程ID
+    ngx_parent = ngx_pid.load(); // 记录父进程ID
     ngx_pid = getpid(); // 记录子进程ID
     
     // (2)脱离终端，终端关闭，此进程成为守护进程

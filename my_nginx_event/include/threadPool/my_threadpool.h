@@ -55,6 +55,7 @@ private:
 private:
 
     std::condition_variable m_cv; // 条件变量
+    std::condition_variable m_cv_init;
     std::atomic<bool> m_shutdown{false};    // 原子操作保证线程安全
 
     std::atomic<int> m_iThreadNum; // 线程池中线程的数量

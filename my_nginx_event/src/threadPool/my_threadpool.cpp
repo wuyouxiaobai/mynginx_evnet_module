@@ -48,8 +48,8 @@ bool CThreadPool::Create(int threadNum)
         return false;
     }
 
-    // 等待所有线程启动完成（避免忙等待）
-    m_cv.wait(lock, [this] {
+    // 等待所有线程启动完成
+    m_cv_init.wait(lock, [this] {
         return std::all_of(m_threadVector.begin(), m_threadVector.end(),
             [](const auto& item) { return item->ifrunning; });
     });
@@ -181,9 +181,16 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
     
     while(!shutdown.load(std::memory_order_acquire)) 
     {
+
         Message buf;
         {
             std::unique_lock<std::mutex> lock(pThreadPool->m_pthreadMutex);
+            if(pThread->ifrunning == false)
+            {
+                pThread->ifrunning = true;
+                pThreadPool->m_cv_init.notify_one();
+            }
+
             pThreadPool->m_cv.wait(lock, [&] {
                 return !pThreadPool->m_MsgRecvQueue.empty() || shutdown;
             });
