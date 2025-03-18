@@ -43,60 +43,15 @@ bool CLogicSocket::Initialize()
 {
     //做一些和本类相关的初始化工作
     //....日后根据需要扩展        
-    bool bParentInit = CSocket::Initialize();  //调用父类的同名函数
+    Initialize();  //调用父类的同名函数
     InitRouter();
-    return bParentInit;
-}
-
-// 初始化时注册
-bool CLogicSocket::InitRegist()
-{
-// 示例：注册动态路径心跳
-    // m_Router->addRegexCallback(
-    //     HttpRequest::Method::kGet, 
-    //     "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
-    //     [](const HttpRequest& req, HttpResponse* resp) {
-    //         resp->setStatusCode(HttpResponse::HttpStatusCode::k200Ok);
-    //         resp->setBody("Dynamic PONG");
-    //     }
-    // );
-
-    m_Router->registerCallback(  // 改用精确匹配方法
-        HttpRequest::Method::kGet,
-        "/hello",  // 静态路径
-        [](const HttpRequest& req, HttpResponse* resp) {
-            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
-            resp->setCloseConnection(false);
-            // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
-            resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
-            resp->setBody("hello world"); // 直接返回中文文本
-        }
-    );
-
-    // 新增HTML文件路由
-    m_Router->registerCallback(
-        HttpRequest::Method::kGet,
-        "/gethtml",
-        [](const HttpRequest& req, HttpResponse* resp) {
-            // 设置响应头
-            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
-            resp->setContentType("text/html; charset=utf-8");
-            resp->setCloseConnection(false);
-            // 读取HTML文件
-            std::ifstream file("../html/test.html", std::ios::in | std::ios::binary);
-            if (file) {
-                std::string content((std::istreambuf_iterator<char>(file)), 
-                                    std::istreambuf_iterator<char>());
-                resp->setBody(content);
-            } else {
-                resp->setStatusCode(HttpResponse::HttpStatusCode::k404NotFound);
-                resp->setBody("HTML File Not Found");
-            }
-        }
-    );
-
+    InitMiddleware();
+    InitSessionManager();
     return true;
 }
+
+
+
 
 
 void CLogicSocket::registCallback(HttpRequest::Method method, const std::string &path, const Router::HandlerCallback &callback)
@@ -289,6 +244,80 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
 
 
 
+/// 路由相关
+// 初始化时注册
+bool CLogicSocket::InitRouterRegist()
+{
+// 示例：注册动态路径心跳
+    // m_Router->addRegexCallback(
+    //     HttpRequest::Method::kGet, 
+    //     "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
+    //     [](const HttpRequest& req, HttpResponse* resp) {
+    //         resp->setStatusCode(HttpResponse::HttpStatusCode::k200Ok);
+    //         resp->setBody("Dynamic PONG");
+    //     }
+    // );
+
+    m_Router->registerCallback(  // 改用精确匹配方法
+        HttpRequest::Method::kGet,
+        "/hello",  // 静态路径
+        [](const HttpRequest& req, HttpResponse* resp) {
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setCloseConnection(false);
+            // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
+            resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
+            resp->setBody("hello world"); // 直接返回中文文本
+        }
+    );
+
+    // 新增HTML文件路由
+    m_Router->registerCallback(
+        HttpRequest::Method::kGet,
+        "/gethtml",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            // 设置响应头
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("text/html; charset=utf-8");
+            resp->setCloseConnection(false);
+            // 读取HTML文件
+            std::ifstream file("../html/test.html", std::ios::in | std::ios::binary);
+            if (file) {
+                std::string content((std::istreambuf_iterator<char>(file)), 
+                                    std::istreambuf_iterator<char>());
+                resp->setBody(content);
+            } else {
+                resp->setStatusCode(HttpResponse::HttpStatusCode::k404NotFound);
+                resp->setBody("HTML File Not Found");
+            }
+        }
+    );
+
+    return true;
+}
+
+
+
+/// 中间件相关
+// 初始化时注册
+void CLogicSocket::InitMiddleware() 
+{
+
+}
+
+
+
+/// session相关
+// 初始化时注册
+void CLogicSocket::InitSessionManager()
+{
+//示例使用内存存储
+    // 创建会话存储
+    auto sessionStorage = std::make_unique<MemorySessionStorage>(); 
+    // 创建会话管理器
+    auto sessionManager = std::make_unique<SessionManager>(std::move(sessionStorage));
+    // 设置会话管理器
+    setSessionManager(std::move(sessionManager));
+}
 
 
 
@@ -306,8 +335,13 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
 
 
 
-// // 心跳包检测时间到，该去检测心跳包是否超时的事宜，本函数是子类函数，实现具体的判断动作
-void CLogicSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t cur_time){}
+
+
+
+
+
+// // // 心跳包检测时间到，该去检测心跳包是否超时的事宜，本函数是子类函数，实现具体的判断动作
+// void CLogicSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t cur_time){}
 // {
 //     CMemory memory = CMemory::getInstance();
 //     if(tmpmsg->iCurrsequence == tmpmsg->pConn->iCurrsequence)//此连接没断
@@ -337,7 +371,7 @@ void CLogicSocket::procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t cur
 
 
 // // 发送没有包体的数据包给客户端
-void CLogicSocket::SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t iMsgCode){}
+// void CLogicSocket::SendNoBodyPkgToClient(LPSTRUC_MSG_HEADER pMsgHeader, uint16_t iMsgCode){}
 // {
 //     CMemory memory = CMemory::getInstance();
 
