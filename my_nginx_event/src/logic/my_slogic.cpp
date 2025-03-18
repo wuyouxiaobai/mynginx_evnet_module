@@ -7,7 +7,7 @@
 #include "my_memory.h"
 #include <cstring>
 #include "my_global.h"
-
+#include <fstream>  
 namespace WYXB
 {
 // //定义成员函数指针
@@ -48,18 +48,18 @@ bool CLogicSocket::Initialize()
     return bParentInit;
 }
 
-// 根据需求注册对应业务函数
-bool CLogicSocket::regist()
+// 初始化时注册
+bool CLogicSocket::InitRegist()
 {
 // 示例：注册动态路径心跳
-    m_Router->addRegexCallback(
-        HttpRequest::Method::kGet, 
-        "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
-        [](const HttpRequest& req, HttpResponse* resp) {
-            resp->setStatusCode(HttpResponse::HttpStatusCode::k200Ok);
-            resp->setBody("Dynamic PONG");
-        }
-    );
+    // m_Router->addRegexCallback(
+    //     HttpRequest::Method::kGet, 
+    //     "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
+    //     [](const HttpRequest& req, HttpResponse* resp) {
+    //         resp->setStatusCode(HttpResponse::HttpStatusCode::k200Ok);
+    //         resp->setBody("Dynamic PONG");
+    //     }
+    // );
 
     m_Router->registerCallback(  // 改用精确匹配方法
         HttpRequest::Method::kGet,
@@ -67,13 +67,41 @@ bool CLogicSocket::regist()
         [](const HttpRequest& req, HttpResponse* resp) {
             resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
             resp->setCloseConnection(false);
-            resp->addHeader("Keep-Alive", "timeout=5, max=100");  
+            // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
             resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
             resp->setBody("hello world"); // 直接返回中文文本
         }
     );
 
+    // 新增HTML文件路由
+    m_Router->registerCallback(
+        HttpRequest::Method::kGet,
+        "/gethtml",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            // 设置响应头
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("text/html; charset=utf-8");
+            resp->setCloseConnection(false);
+            // 读取HTML文件
+            std::ifstream file("../html/test.html", std::ios::in | std::ios::binary);
+            if (file) {
+                std::string content((std::istreambuf_iterator<char>(file)), 
+                                    std::istreambuf_iterator<char>());
+                resp->setBody(content);
+            } else {
+                resp->setStatusCode(HttpResponse::HttpStatusCode::k404NotFound);
+                resp->setBody("HTML File Not Found");
+            }
+        }
+    );
+
     return true;
+}
+
+
+void CLogicSocket::registCallback(HttpRequest::Method method, const std::string &path, const Router::HandlerCallback &callback)
+{
+    m_Router->registerCallback(method, path, callback);
 }
 
 
@@ -233,6 +261,7 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
             resp->setStatusCode(HttpResponse::k404NotFound);
             resp->setStatusMessage("Not Found");
             resp->setCloseConnection(true);
+            resp->setVersion(req.getVersion());
         }
 
         // 处理响应后的中间件

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>欢迎使用Nginx测试页面</h1>
+    <div class="content">
+        <p>这是一个用于测试的HTML文件，包含以下功能：</p>
+        <ul>
+            <li>UTF-8中文支持</li>
+            <li>基础CSS样式</li>
+            <li>响应式布局</li>
+        </ul>
+        <p>当前时间：<span id="time"></span></p>
+    </div>
+
+    <script>
+        // 简单的时间显示
+        function updateTime() {
+            const timeSpan = document.getElementById('time');
+            const now = new Date();
+            timeSpan.textContent = now.toLocaleString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+    </script>
+</body>
+</html>

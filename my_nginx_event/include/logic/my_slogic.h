@@ -23,16 +23,20 @@ public:
     // 解析http请求的函数
     virtual void threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf);
 
+
 private:
 
     std::shared_ptr<Router> m_Router;
     void InitRouter() {
         m_Router = std::make_shared<Router>();
-        regist();
+        InitRegist();
     }
 
     // 注册
-    bool regist();
+    bool InitRegist();
+
+public:
+    void registCallback(HttpRequest::Method method, const std::string &path, const Router::HandlerCallback &callback);
 
 private:
     void onRequest(lpngx_connection_t conn, const HttpRequest &req);

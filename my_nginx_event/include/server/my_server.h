@@ -139,7 +139,53 @@ public:
     std::shared_ptr<CThreadPool> g_threadpool;
 
 //socket相关
-    std::shared_ptr<CSocket> g_socket;
+    std::shared_ptr<CLogicSocket> g_socket;
+
+public:
+// 通用回调函数注册方法  
+    bool registGet(const std::string& path, Router::HandlerCallback callback) {  
+        g_socket->registCallback(  
+            HttpRequest::Method::kGet,   
+            path,   
+            callback  
+        );  
+        return true;  
+    }  
+
+    bool registPut(const std::string& path, Router::HandlerCallback callback) {  
+        g_socket->registCallback( 
+            HttpRequest::Method::kPut,   
+            path,   
+            callback  
+        );  
+        return true;  
+    }  
+
+    bool registPost(const std::string& path, Router::HandlerCallback callback) {  
+        g_socket->registCallback( 
+            HttpRequest::Method::kPost,   
+            path,   
+            callback  
+        );  
+        return true;  
+    }  
+
+    bool registDelete(const std::string& path, Router::HandlerCallback callback) {  
+        g_socket->registCallback( 
+            HttpRequest::Method::kDelete,   
+            path,   
+            callback  
+        );  
+        return true;  
+    }  
+
+    // 通用方法，支持任意 HTTP 方法  
+    bool registRoute(HttpRequest::Method method,   
+                        const std::string& path,   
+                        Router::HandlerCallback callback) {  
+        g_socket->registCallback(method, path, callback);  
+        return true;  
+    }
 
 };
 } // namespace WYXB

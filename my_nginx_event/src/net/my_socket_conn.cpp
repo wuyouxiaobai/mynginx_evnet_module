@@ -293,6 +293,7 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
     std::lock_guard<std::mutex> lock(m_recyconnqueueMutex);
     auto it = std::find(m_recyconnectionList.begin(), m_recyconnectionList.end(), p_Conn);
     if (it != m_recyconnectionList.end()) {  // 已经存在
+        Logger::ngx_log_stderr(0, "already in Recy queue and size: %d", m_recyconnectionList.size());
         return;
     }
     
@@ -305,7 +306,7 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
 
     // 最终提交
     m_recyconnectionList.push_back(p_Conn);
-    Logger::ngx_log_stderr(0, "Recy queue size: %u", m_recyconnectionList.size());
+    Logger::ngx_log_stderr(0, "Recy queue size: %d", m_recyconnectionList.size());
 
 
 }
@@ -436,6 +437,7 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
                 // }
                 pSocket->ngx_free_connection(conn);
             }
+            Logger::ngx_log_error_core(NGX_LOG_INFO, 0 ,"Recying................");
             batch_cleanup.clear();
         }
 
