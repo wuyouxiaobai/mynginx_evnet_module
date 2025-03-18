@@ -5,6 +5,9 @@
 #include <condition_variable>
 #include <nlohmann/json.hpp>
 
+
+namespace WYXB
+{
 class ConnectionPool
 {
 public:
@@ -37,3 +40,4 @@ private:
     std::condition_variable consumer_cond;
     std::condition_variable producer_cond;
 };
+}

@@ -1,4 +1,3 @@
-#include "my_logiccomm.h"
 #include "my_slogic.h"
 #include "my_comm.h"
 #include "arpa/inet.h"
@@ -47,6 +46,7 @@ bool CLogicSocket::Initialize()
     InitRouter();
     InitMiddleware();
     InitSessionManager();
+    InitMysql() ;
     return true;
 }
 
@@ -317,6 +317,18 @@ void CLogicSocket::InitSessionManager()
     auto sessionManager = std::make_unique<SessionManager>(std::move(sessionStorage));
     // 设置会话管理器
     setSessionManager(std::move(sessionManager));
+}
+
+
+
+
+
+
+/// 数据库相关
+// 初始化时
+void CLogicSocket::InitMysql() 
+{
+    dbconn_ = ConnectionPool::getInstance()->getConnection();
 }
 
 

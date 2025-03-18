@@ -1,8 +1,11 @@
 #pragma once
-#include <mysql.h>
+#include <mysql/mysql.h>
 #include <string>
 #include <chrono>
 
+
+namespace WYXB
+{
 class MySQLConn
 {
 public:
@@ -31,3 +34,4 @@ private:
     MYSQL_ROW row_;
     std::chrono::steady_clock::time_point aliveTime_;
 };
+}

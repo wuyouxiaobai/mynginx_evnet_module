@@ -5,6 +5,7 @@
 #include "router.h"
 #include "middlewareChain.h"
 #include "sessionManager.h"
+#include "connectionPool.h"
 
 namespace WYXB
 {
@@ -78,6 +79,15 @@ private:
 
     // 初始化时注册
     void InitSessionManager() ;
+
+
+/// 数据库相关
+    // 初始化时
+    void InitMysql() ;
+
+    std::shared_ptr<MySQLConn> dbconn_;
+
+
 };
 
 

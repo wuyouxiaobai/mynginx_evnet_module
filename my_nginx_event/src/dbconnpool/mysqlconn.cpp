@@ -1,5 +1,7 @@
 #include "mysqlconn.h"
 
+namespace WYXB
+{
 MySQLConn::MySQLConn()
 {
     conn_ = mysql_init(NULL);
@@ -100,4 +102,5 @@ long long MySQLConn::getAliveTime()
 {
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - aliveTime_);
     return ms.count();
+}
 }
