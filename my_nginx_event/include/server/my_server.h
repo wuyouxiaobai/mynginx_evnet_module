@@ -142,6 +142,7 @@ public:
     std::shared_ptr<CLogicSocket> g_socket;
 
 public:
+/// 路由相关
 // 通用回调函数注册方法  
     bool registGet(const std::string& path, Router::HandlerCallback callback) {  
         g_socket->registCallback(  
@@ -185,6 +186,13 @@ public:
                         Router::HandlerCallback callback) {  
         g_socket->registCallback(method, path, callback);  
         return true;  
+    }
+
+/// 中间件相关
+public:
+    void addMiddleware(std::shared_ptr<Middleware> middleware)
+    {
+        g_socket->addMiddleware(middleware);
     }
 
 };

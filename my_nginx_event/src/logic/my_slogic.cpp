@@ -251,7 +251,7 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
     {
         // 处理请求前的中间件
         HttpRequest mutableReq = req;
-        // middlewareChain_.processBefore(mutableReq);
+        middlewareChain_.processBefore(mutableReq);
 
         // 路由处理
         if (!m_Router->route(mutableReq, resp))
@@ -265,7 +265,7 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
         }
 
         // 处理响应后的中间件
-        // middlewareChain_.processAfter(*resp);
+        middlewareChain_.processAfter(*resp);
     }
     catch (const HttpResponse& res) 
     {

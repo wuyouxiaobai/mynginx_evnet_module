@@ -3,7 +3,7 @@
 #include <functional>
 #include <unordered_map>
 #include "router.h"
-
+#include "middlewareChain.h"
 
 
 namespace WYXB
@@ -54,6 +54,14 @@ private:
     // bool HandleLogin(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, uint16_t iBodyLength);
     // bool HandlePing(lpngx_connection_t pConn, LPSTRUC_MSG_HEADER pMsgHeader, char* pPkgBody, uint16_t iBodyLength);
 
+///中间件
+private:
+    MiddlewareChain middlewareChain_;
+    //添加中间件
+public:
+    void addMiddleware(std::shared_ptr<Middleware> middleware) {
+        middlewareChain_.addMiddleware(middleware);
+    }
 };
 
 
