@@ -6,7 +6,9 @@
 #include "my_memory.h"
 #include <cstring>
 #include "my_global.h"
-#include <fstream>  
+#include <fstream> 
+#include "my_macro.h" 
+#include <nlohmann/json.hpp>
 namespace WYXB
 {
 // //定义成员函数指针
@@ -42,11 +44,11 @@ bool CLogicSocket::Initialize()
 {
     //做一些和本类相关的初始化工作
     //....日后根据需要扩展        
-    Initialize();  //调用父类的同名函数
+    CSocket::Initialize();  //调用父类的同名函数
     InitRouter();
     InitMiddleware();
     InitSessionManager();
-    InitMysql() ;
+    // InitMysql() ;
     return true;
 }
 
@@ -63,8 +65,10 @@ void CLogicSocket::registCallback(HttpRequest::Method method, const std::string 
 //处理接收消息队列中的消息，由线程池调用
 void CLogicSocket::threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf)
 {
+    Logger::ngx_log_stderr(0, "threadRecvProcFunc ing。。。。。。。。");
     // 检查缓冲区大小是否至少包含头部
     if (pMsgBuf.size() < sizeof(STRUC_MSG_HEADER)) {
+        Logger::ngx_log_stderr(0, "Buffer size is smaller than the header size.");
         throw std::runtime_error("Buffer size is smaller than the header size.");
     }
 
@@ -82,23 +86,33 @@ void CLogicSocket::threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf)
         lpngx_connection_t headptr =  header.pConn.lock();
         if(!headptr || headptr->iCurrsequence != header.iCurrsequence) // 连接已经断开
         {
+            Logger::ngx_log_stderr(0, "连接已经断开。。。。。。。。。");
             return;
         }    
+
+        Logger::ngx_log_stderr(0, "解析前1。。。。。。。。。");
         bool ok = headptr->context_->parseRequest(dataBody, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
+        Logger::ngx_log_stderr(0, "解析前2。。。。。。。。。");
         if(!ok) // 未完成解析
         {
-            if(!isErr) return; // 解析过程没有出错，直接返回
 
+            if(!isErr) 
+            {            
+                Logger::ngx_log_stderr(0, "未完全解析");
+                return; // 解析过程没有出错，直接返回
+            }
+            Logger::ngx_log_stderr(0, "msgSend(HTTP/1.1 400 Bad Request\r\n\r\n, headptr) 。。。。。。");
             msgSend("HTTP/1.1 400 Bad Request\r\n\r\n", headptr); // 返回错误响应
             return;
 
         }
         // 成功解析，处理数据体  
+        Logger::ngx_log_stderr(0, "onRequest前1。。。。。。。。。");
         onRequest(headptr, headptr->context_->request());
-        headptr->context_->reset();
-
+        // headptr->context_->reset();
+        Logger::ngx_log_stderr(0, "成功解析，处理数据体");
     } else {
-        std::cout << "No data body present." << std::endl;
+        Logger::ngx_log_stderr(0, "No data body present.");
     }
 
 
@@ -181,9 +195,15 @@ void CLogicSocket::threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf)
 void CLogicSocket::onRequest(lpngx_connection_t conn, const HttpRequest &req)
 {
     const std::string &connection = req.getHeader("Connection");
-    bool close = ((connection == "close") ||
-                  (req.getVersion() == "HTTP/1.1" && connection != "Keep-Alive"));
+    Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "Connection: %s", connection.c_str());
+    bool connection_close = (strcasecmp(connection.c_str(), "close") == 0);
+    bool is_http11_keepalive = (strcasecmp(req.getVersion().c_str(), "HTTP/1.1") == 0 && strcasecmp(connection.c_str(), "keep-alive") == 0);
+    bool is_http10_keepalive = (strcasecmp(req.getVersion().c_str(), "HTTP/1.0") == 0 && strcasecmp(connection.c_str(), "keep-alive") == 0);
+    bool close = connection_close || !(is_http11_keepalive || is_http10_keepalive);
+
     HttpResponse response(close);
+    conn->ishttpClose = close;
+
 
     // 根据请求报文信息来封装响应报文对象
     handleRequest(req, &response); 
@@ -194,7 +214,7 @@ void CLogicSocket::onRequest(lpngx_connection_t conn, const HttpRequest &req)
     response.appendToBuffer(buf);
     // 打印完整的响应内容用于调试
     // LOG_INFO << "Sending response:\n" << buf.toStringPiece().as_string();
-
+    Logger::ngx_log_stderr(0, "msgSend %s.........", buf.c_str());
     msgSend(buf, conn);
 
 }
@@ -206,13 +226,15 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
     {
         // 处理请求前的中间件
         HttpRequest mutableReq = req;
+        // Logger::ngx_log_stderr(0, "middlewareChain_ 前 .........");
         middlewareChain_.processBefore(mutableReq);
-
+        // Logger::ngx_log_stderr(0, "middlewareChain_ 后 .........");
         // 路由处理
         if (!m_Router->route(mutableReq, resp))
         {
             // LOG_INFO << "请求的啥，url：" << req.method() << " " << req.path();
             // LOG_INFO << "未找到路由，返回404";
+            Logger::ngx_log_stderr(0, "Not Found .........");
             resp->setStatusCode(HttpResponse::k404NotFound);
             resp->setStatusMessage("Not Found");
             resp->setCloseConnection(true);
@@ -220,16 +242,20 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
         }
 
         // 处理响应后的中间件
+        // Logger::ngx_log_stderr(0, "middlewareChain_ processAfter前 .........");
         middlewareChain_.processAfter(*resp);
+        // Logger::ngx_log_stderr(0, "middlewareChain_ processAfter后 .........");
     }
     catch (const HttpResponse& res) 
     {
         // 处理中间件抛出的响应（如CORS预检请求）
+        Logger::ngx_log_stderr(0, "处理中间件抛出的响应 .........");
         *resp = res;
     }
     catch (const std::exception& e) 
     {
         // 错误处理
+        Logger::ngx_log_stderr(0, "k500InternalServerError .........");
         resp->setStatusCode(HttpResponse::k500InternalServerError);
         resp->setBody(e.what());
     }
@@ -258,12 +284,13 @@ bool CLogicSocket::InitRouterRegist()
     //     }
     // );
 
+
+
     m_Router->registerCallback(  // 改用精确匹配方法
         HttpRequest::Method::kGet,
         "/hello",  // 静态路径
         [](const HttpRequest& req, HttpResponse* resp) {
             resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
-            resp->setCloseConnection(false);
             // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
             resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
             resp->setBody("hello world"); // 直接返回中文文本
@@ -273,12 +300,92 @@ bool CLogicSocket::InitRouterRegist()
     // 新增HTML文件路由
     m_Router->registerCallback(
         HttpRequest::Method::kGet,
+        "/getposthtml",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            // 设置响应头
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("text/html; charset=utf-8");
+            // 读取HTML文件
+            std::ifstream file("../html/posttest.html", std::ios::in | std::ios::binary);
+            if (file) {
+                std::string content((std::istreambuf_iterator<char>(file)), 
+                                    std::istreambuf_iterator<char>());
+                resp->setBody(content);
+            } else {
+                resp->setStatusCode(HttpResponse::HttpStatusCode::k404NotFound);
+                resp->setBody("HTML File Not Found");
+            }
+        }
+    );
+
+    m_Router->registerCallback(
+        HttpRequest::Method::kPost,
+        "/submit",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            try {
+                
+                // 设置响应头
+                resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+                resp->setContentType("text/html; charset=utf-8");
+                // 解析表单数据
+                std::string body = req.getBody();
+                std::string prefix = "testData=";
+                size_t pos = body.find(prefix);
+                
+                if (pos == std::string::npos) {
+                    throw std::runtime_error("Invalid form data");
+                }
+    
+                // URL解码并获取值
+                std::string encoded = body.substr(pos + prefix.length());
+                std::string decoded;
+                for (size_t i = 0; i < encoded.size(); ++i) {
+                    if (encoded[i] == '%' && i+2 < encoded.size()) {
+                        int hex;
+                        sscanf(encoded.substr(i+1,2).c_str(), "%x", &hex);
+                        decoded += static_cast<char>(hex);
+                        i += 2;
+                    } else if (encoded[i] == '+') {
+                        decoded += ' ';
+                    } else {
+                        decoded += encoded[i];
+                    }
+                }
+    
+                // 构造JSON响应
+                nlohmann::json response = {
+                    {"status", "success"},
+                    {"message", "数据接收成功"},
+                    {"input", decoded},
+                    {"length", decoded.length()},
+                    {"timestamp", static_cast<long>(std::time(nullptr))}
+                };
+    
+                resp->setStatusCode(HttpResponse::k200Ok);
+                resp->setContentType("application/json; charset=utf-8");
+                resp->setBody(response.dump());
+    
+            } catch (const std::exception& e) {
+                nlohmann::json error = {
+                    {"status", "error"},
+                    {"error_type", "invalid_request"},
+                    {"message", e.what()}
+                };
+                resp->setStatusCode(HttpResponse::k400BadRequest);
+                resp->setContentType("application/json; charset=utf-8");
+                resp->setBody(error.dump());
+            }
+        }
+    );
+
+
+    m_Router->registerCallback(
+        HttpRequest::Method::kGet,
         "/gethtml",
         [](const HttpRequest& req, HttpResponse* resp) {
             // 设置响应头
             resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
             resp->setContentType("text/html; charset=utf-8");
-            resp->setCloseConnection(false);
             // 读取HTML文件
             std::ifstream file("../html/test.html", std::ios::in | std::ios::binary);
             if (file) {
@@ -291,6 +398,156 @@ bool CLogicSocket::InitRouterRegist()
             }
         }
     );
+
+    m_Router->registerCallback(
+        HttpRequest::Method::kPost,
+        "/uploadvideo",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            // 1. 确保上传目录存在
+            const std::string uploadDir = "../video/";
+            if (!std::filesystem::exists(uploadDir)) {
+                std::filesystem::create_directories(uploadDir);
+            }
+    
+            // 2. 解析Content-Type获取boundary
+            std::string contentType = req.getHeader("Content-Type");
+            size_t boundaryPos = contentType.find("boundary=");
+            if (boundaryPos == std::string::npos) {
+                resp->setStatusCode(HttpResponse::k400BadRequest);
+                resp->setBody("Invalid Content-Type");
+                return;
+            }
+            std::string boundary = "--" + contentType.substr(boundaryPos + 9);
+    
+            // 3. 获取原始请求体
+            const std::string& body = req.getBody();
+    
+            // 4. 解析multipart数据
+            size_t fileStart = body.find(boundary);
+            while (fileStart != std::string::npos) {
+                size_t headersEnd = body.find("\r\n\r\n", fileStart);
+                if (headersEnd == std::string::npos) break;
+    
+                // 解析文件头信息
+                std::string headers = body.substr(
+                    fileStart + boundary.length() + 2, // 跳过boundary和换行
+                    headersEnd - (fileStart + boundary.length() + 2)
+                );
+    
+                // 查找文件名
+                size_t namePos = headers.find("filename=\"");
+                if (namePos != std::string::npos) {
+                    size_t endQuote = headers.find("\"", namePos + 10);
+                    std::string filename = headers.substr(
+                        namePos + 10,
+                        endQuote - (namePos + 10)
+                    );
+    
+                    // 提取文件内容
+                    size_t dataStart = headersEnd + 4;
+                    size_t dataEnd = body.find(boundary, dataStart);
+                    std::string fileContent = body.substr(
+                        dataStart,
+                        dataEnd - dataStart - 4 // 减去结尾的\r\n
+                    );
+    
+                    // 保存文件
+                    std::ofstream out(uploadDir + filename, std::ios::binary);
+                    out.write(fileContent.data(), fileContent.size());
+                    resp->setStatusCode(HttpResponse::k200Ok);
+                    resp->setBody("Upload success");
+                    return;
+                }
+    
+                fileStart = body.find(boundary, headersEnd);
+            }
+    
+            // 未找到有效文件
+            resp->setStatusCode(HttpResponse::k400BadRequest);
+            resp->setBody("No video file received");
+        }
+    );
+    
+    m_Router->registerCallback(
+        HttpRequest::Method::kGet,
+        "/getvideos",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            // 使用命名常量提升可维护性
+            constexpr const char* videoDir = "../video/";
+            constexpr const char* targetExt = ".mp4";
+            
+            std::vector<std::string> videos;
+    
+            try {
+                // 前置目录检查避免异常
+                if (!std::filesystem::exists(videoDir)) {
+                    throw std::runtime_error("Directory not found");
+                }
+    
+                // 优化文件遍历逻辑
+                for (const auto& entry : std::filesystem::directory_iterator(videoDir)) {
+                    if (entry.is_regular_file()) {
+                        // 不区分大小写的扩展名比较
+                        std::string ext = entry.path().extension().string();
+                        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                        
+                        if (ext == targetExt) {
+                            videos.emplace_back(entry.path().filename().string());
+                        }
+                    }
+                }
+    
+                // 使用nlohmann/json直接序列化
+                resp->setContentType("application/json; charset=utf-8");
+                resp->setBody(nlohmann::json(videos).dump());
+                
+                // 添加缓存控制头
+                resp->addHeader("Cache-Control", "max-age=3600");
+    
+            } catch (const std::exception& e) {
+                // 细化错误处理
+                Logger::ngx_log_stderr(0, "Video list error: %s | Path: %s", 
+                                     e.what(), videoDir);
+                
+                resp->setStatusCode(HttpResponse::k503ServiceUnavailable);
+                resp->setContentType("application/problem+json");
+                
+                nlohmann::json error = {
+                    {"type", "/errors/video-list"},
+                    {"title", "Video Listing Failed"},
+                    {"status", 503},
+                    {"detail", "Failed to retrieve video list"}
+                };
+                resp->setBody(error.dump());
+            }
+        }
+    );
+    
+    // m_Router->registerCallback(
+    //     HttpRequest::Method::kGet,
+    //     "/getvideo/(.+)", // 正则匹配文件名
+    //     [](const HttpRequest& req, HttpResponse* resp) {
+    //         const std::string videoPath = "../video/" + req.getPath().substr(10); // 提取文件名
+            
+    //         std::ifstream file(videoPath, std::ios::binary | std::ios::ate);
+    //         if (!file) {
+    //             resp->setStatusCode(HttpResponse::k404NotFound);
+    //             return;
+    //         }
+    
+    //         // 设置视频流响应头
+    //         resp->setContentType("video/mp4");
+    //         resp->addHeader("Accept-Ranges", "bytes");
+            
+    //         // 读取文件内容
+    //         std::streamsize size = file.tellg();
+    //         file.seekg(0, std::ios::beg);
+    //         std::vector<char> buffer(size);
+    //         if (file.read(buffer.data(), size)) {
+    //             resp->setBody(std::string(buffer.data(), buffer.size()));
+    //         }
+    //     }
+    // );
 
     return true;
 }

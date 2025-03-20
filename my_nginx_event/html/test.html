@@ -2,46 +2,133 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>测试页面</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频功能测试</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
             max-width: 800px;
-            margin: 20px auto;
+            margin: 0 auto;
             padding: 20px;
+            background: #f0f4f8;
         }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
+
+        .video-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
         }
-        .content {
-            background-color: #f9f9f9;
-            padding: 15px;
-            border-radius: 5px;
+
+        .upload-section {
+            margin-bottom: 2rem;
+        }
+
+        input[type="file"] {
+            margin: 10px 0;
+        }
+
+        progress {
+            display: block;
+            margin-top: 10px;
+        }
+
+        #videoSelector {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+        }
+
+        #mainPlayer {
+            width: 100%;
+            margin-top: 15px;
+            background: #000;
         }
     </style>
 </head>
 <body>
-    <h1>欢迎使用Nginx测试页面</h1>
-    <div class="content">
-        <p>这是一个用于测试的HTML文件，包含以下功能：</p>
-        <ul>
-            <li>UTF-8中文支持</li>
-            <li>基础CSS样式</li>
-            <li>响应式布局</li>
-        </ul>
-        <p>当前时间：<span id="time"></span></p>
+    <div class="video-section">
+        <!-- 上传表单 -->
+        <div class="upload-section">
+            <input type="file" id="videoUpload" accept="video/*">
+            <button onclick="uploadVideo()">上传视频</button>
+            <progress id="uploadProgress" value="0" max="100"></progress>
+        </div>
+
+        <!-- 视频列表 -->
+        <div class="video-list">
+            <select id="videoSelector" onchange="changeVideo(this.value)">
+                <option value="">选择视频文件</option>
+            </select>
+        </div>
+
+        <!-- 播放器 -->
+        <div class="player-container">
+            <video id="mainPlayer" controls>
+                <source id="videoSource" type="video/mp4">
+                您的浏览器不支持视频播放
+            </video>
+        </div>
     </div>
 
     <script>
-        // 简单的时间显示
-        function updateTime() {
-            const timeSpan = document.getElementById('time');
-            const now = new Date();
-            timeSpan.textContent = now.toLocaleString();
+        // 初始化加载视频列表
+        function loadVideoList() {
+            fetch('/getvideos')
+                .then(res => res.json())
+                .then(videos => {
+                    const selector = document.getElementById('videoSelector');
+                    selector.innerHTML = '<option value="">选择视频文件</option>';
+                    videos.forEach(video => {
+                        const option = document.createElement('option');
+                        option.value = video;
+                        option.textContent = video;
+                        selector.appendChild(option);
+                    });
+                });
         }
-        setInterval(updateTime, 1000);
-        updateTime();
+
+        // 视频上传功能
+        function uploadVideo() {
+            const input = document.getElementById('videoUpload');
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            fetch('/uploadvideo', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('上传失败');
+                return response.text();
+            })
+            .then(() => {
+                loadVideoList();
+                document.getElementById('uploadProgress').value = 0;
+            })
+            .catch(error => {
+                console.error('上传错误:', error);
+                alert('视频上传失败');
+            });
+        }
+
+        // 切换播放视频
+        function changeVideo(filename) {
+            if (!filename) return;
+            const player = document.getElementById('mainPlayer');
+            player.pause();
+            document.getElementById('videoSource').src = `/getvideo/${encodeURIComponent(filename)}`;
+            player.load();
+            player.play().catch(() => {}); // 自动播放被阻止时静默失败
+        }
+
+        // 初始化加载列表
+        loadVideoList();
     </script>
 </body>
 </html>

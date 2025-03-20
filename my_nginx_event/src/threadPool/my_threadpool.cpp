@@ -162,7 +162,7 @@ void CThreadPool::Call() //唤醒线程
             Logger::ngx_log_stderr(0,"CThreadPool::Call()中发现线程池中当前空闲线程数量为0，要考虑扩容线程池了!");
         }
     }
-
+    Logger::ngx_log_stderr(0,"Call() test ..........");
     return;
 }
 
@@ -207,12 +207,14 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
         
         try {
             if (!buf.empty()) {
+                Logger::ngx_log_stderr(0, "threadRecvProcFunc start!");
                 Server::instance().g_socket->threadRecvProcFunc(std::move(buf));
             }
         } catch(...) {
+            Logger::ngx_log_stderr(0, "异常处理........");
             // 异常处理
         }
-        
+        Logger::ngx_log_stderr(0, "threadRecvProcFunc finish!");
         pThreadPool->m_iRunningThreadNum.fetch_sub(1, std::memory_order_release);
     }
     return nullptr;

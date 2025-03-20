@@ -175,9 +175,13 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
 
 
 // http相关
-    std::atomic_bool ishttp{false};
     std::shared_ptr<HttpContext> context_; // 解析并暂存的http请求报文
     Buffer psendbuf;
+    std::atomic_bool ishttpClose{true};
+
+
+// 多线程互斥
+    std::mutex mtx;
 
 
 // 删除拷贝操作，允许移动操作

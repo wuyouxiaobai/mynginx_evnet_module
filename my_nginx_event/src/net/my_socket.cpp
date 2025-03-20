@@ -587,6 +587,7 @@ int CSocket::ngx_epoll_init()// epoll初始化
                             pConn.get()              //连接池中的连接 
                             ) == -1)
     {
+        Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_init()中ngx_epoll_oper_event()初始化监听事件失败.");
         exit(2); //致命问题，退出吧
     }
     
@@ -737,7 +738,8 @@ int CSocket::ngx_epoll_process_events(int timer)
             }
         }
 
-    }
+    }                
+    // Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件后面1.");
     return 1; //正常返回
 }
 
@@ -756,7 +758,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
 // 优化一下代码，将sendmsg提出
 
 
-    // ngx_log_stderr(errno, "ServerSendQueueThread");
+    Logger::ngx_log_stderr(errno, "ServerSendQueueThread...............");
     auto pThreadItem = static_cast<ThreadItem*>(threadData);
     auto pSocket = pThreadItem->_pThis.lock();
     if (!pSocket) return nullptr;
@@ -802,7 +804,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                 tmpbuf.append(payload_str.c_str(), payload_str.size());
                 // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
                 ssize_t sendsize = pSocket->sendproc(pConn, tmpbuf);
-                Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ServerSendQueueThread tmpbuf is: %s", tmpbuf.peek());
+                // Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ServerSendQueueThread tmpbuf is: %s", tmpbuf.peek());
                 // 结果处理
                 if (sendsize > 0) {
                     if (sendsize == tmpbuf.readableBytes()) {
@@ -810,6 +812,11 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                         // 仅在完整发送时检查400响应
                         if (payload_str == "HTTP/1.1 400 Bad Request\r\n\r\n") {
                             Logger::ngx_log_stderr(0, "发送400错误后关闭连接 fd=%d", pConn->fd);
+                            pSocket->zdClosesocketProc(pConn);
+                        }
+                        if(pConn->ishttpClose)
+                        {
+                            Logger::ngx_log_stderr(0, "服务器主动断开连接 fd=%d", pConn->fd);
                             pSocket->zdClosesocketProc(pConn);
                         }
                     } else {

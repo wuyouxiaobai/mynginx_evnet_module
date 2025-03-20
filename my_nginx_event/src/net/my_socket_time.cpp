@@ -237,9 +237,10 @@ void* CSocket::ServerTimerQueueMonitorThread(void* threadData)
                 std::list<LPSTRUC_MSG_HEADER> lstMsgHeader; //保存要处理的内容
                 LPSTRUC_MSG_HEADER result;
                 {
-                    std::lock_guard<std::mutex> lock(pSocket->m_timequeueMutex); // 互斥锁
+
                     while((result = pSocket->GetOverTimeTimer(curr_time)) != nullptr)
                     {
+                        std::lock_guard<std::mutex> lock(pSocket->m_timequeueMutex); // 互斥锁
                         lstMsgHeader.push_back(result); // 保存要处理的内容
                     }
                 }

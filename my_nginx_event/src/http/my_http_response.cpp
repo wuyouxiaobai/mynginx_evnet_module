@@ -47,7 +47,7 @@ void HttpResponse::appendToBuffer(std::string& outputBuf) const
     
     outputBuf.append(body_);
 
-    Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "outputBuf is: %s", outputBuf.c_str());
+    // Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "outputBuf is: %s", outputBuf.c_str());
 }
 
 void HttpResponse::setStatusLine(const std::string& version,

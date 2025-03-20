@@ -35,7 +35,7 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
     };
 
     // 创建消息缓冲区（头部+最大数据空间）
-    std::vector<uint8_t> buffer(sizeof(STRUC_MSG_HEADER) + 4096);
+    std::vector<uint8_t> buffer(sizeof(STRUC_MSG_HEADER) + 4* 1024 * 1024);
 
     // 在缓冲区头部构造消息头（使用placement new）
     auto* header = new (buffer.data()) STRUC_MSG_HEADER{
@@ -47,13 +47,14 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
     const ssize_t n = recv(
         pConn->fd,
         reinterpret_cast<char*>(buffer.data()) + sizeof(STRUC_MSG_HEADER),
-        4096,
+        4* 1024 * 1024,
         0
     );
 
     // 处理接收结果
     if (n > 0) {
         buffer.resize(sizeof(STRUC_MSG_HEADER) + n);
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "recv msg %s", buffer.data() + sizeof(STRUC_MSG_HEADER));
         Server::instance().g_threadpool->inMsgRecvQueueAndSignal(std::move(buffer));
         return;
     }
@@ -184,6 +185,11 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
                 {
                     //有这情况发生？这可比较麻烦，不过先do nothing
                     Logger::ngx_log_stderr(errno,"CSocekt::ngx_write_request_handler()中ngx_epoll_oper_event()失败。");
+                }
+                if(pConn->ishttpClose)
+                {
+                    Logger::ngx_log_stderr(0, "服务器主动断开连接 fd=%d", pConn->fd);
+                    zdClosesocketProc(pConn);
                 }
                 break;
             }

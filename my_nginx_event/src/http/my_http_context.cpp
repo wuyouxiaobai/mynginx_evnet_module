@@ -1,6 +1,7 @@
 #include "my_http_context.h"
 #include <algorithm>
 #include <cstring>
+#include "my_logger.h"
 
 namespace WYXB
 {
@@ -11,9 +12,11 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
     buffer_.append(buf);
     bool ok = true;
     isErr = false;
+    Logger::ngx_log_stderr(0, "parseRequest...................");
     while (parsed_pos_ < buffer_.size()) {
         switch(state_) {
             case kExpectRequestLine: {
+                Logger::ngx_log_stderr(0, "kExpectRequestLine...................");
                 size_t crlf = buffer_.find("\r\n", parsed_pos_);
                 if (crlf != std::string::npos) {
                     // 请求行长度超过1KB视为攻击尝试
@@ -40,6 +43,7 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
             }
             
             case kExpectHeaders: {
+                Logger::ngx_log_stderr(0, "kExpectHeaders...................");
                 while(parsed_pos_ < buffer_.size()) {
                     size_t crlf = buffer_.find("\r\n", parsed_pos_);
                     if (crlf == std::string::npos) break;
@@ -92,12 +96,17 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
             }
             
             case kExpectBody: {
+                Logger::ngx_log_stderr(0, "kExpectBody...................");
+                size_t needed = request_.contentLength();
                 size_t remaining = buffer_.size() - parsed_pos_;
-                if (remaining >= request_.contentLength()) {
-                    request_.setBody(buffer_.substr(
-                        parsed_pos_, request_.contentLength()));
-                    parsed_pos_ += request_.contentLength();
+                
+                if (remaining >= needed) {
+                    request_.setBody(buffer_.substr(parsed_pos_, needed));
+                    parsed_pos_ += needed;
                     state_ = kGotAll;
+                } else {
+                    state_ = kExpectBody;
+                    ok = false; // 标记已处理到当前末尾
                 }
                 break;
             }
@@ -127,6 +136,11 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
     }
     return ok;
 }
+
+
+
+
+
 
 // 解析请求行
 bool HttpContext::processRequestLine(const char *begin, const char *end)

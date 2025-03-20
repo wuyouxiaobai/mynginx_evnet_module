@@ -76,10 +76,12 @@ void ConnectionPool::addConnection()
         conn->refreshAliveTime();
         connQueue.push(conn);
         Logger::ngx_log_stderr(0, "add connection success");
+        usleep(1000 * 1000);
     }
     else
     {
         Logger::ngx_log_stderr(0, "connect mysql failed");
+        usleep(1000 * 1000);
         delete conn;
     }
 }

@@ -251,11 +251,12 @@ void Server::ngx_worker_process_cycle(int inum,const char *pprocname)
         if (g_stopEvent)   
         {  
             Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "Worker process %P is exiting gracefully...", ngx_pid.load());  
+            // Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件后面5.");
             break; // 跳出循环，准备退出  
         }  
         // 处理网络事件和定时器事件
         ngx_process_events_and_timers(); //处理网络事件和定时器事件
-
+        // Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件后面4.");
 
     }
     

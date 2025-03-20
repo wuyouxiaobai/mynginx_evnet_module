@@ -93,9 +93,8 @@ void ngx_connection_s::PutOneToFree()
     iSendCount = 0;  //重置发送计数
 
     // HTTP 协议标识重置
-    ishttp = false;  // 设置HTTP状态
+    ishttpClose = true;  // 设置HTTP状态
     context_->reset();
-    context_ = nullptr;
    
 // 可选：内存缓冲区清理
     //    if (precvMemPointer) {          // 接收缓冲区清理
@@ -437,7 +436,7 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
                 // }
                 pSocket->ngx_free_connection(conn);
             }
-            Logger::ngx_log_error_core(NGX_LOG_INFO, 0 ,"Recying................");
+            // Logger::ngx_log_error_core(NGX_LOG_INFO, 0 ,"Recying................");
             batch_cleanup.clear();
         }
 

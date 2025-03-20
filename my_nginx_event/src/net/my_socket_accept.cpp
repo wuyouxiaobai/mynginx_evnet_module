@@ -2,6 +2,7 @@
 #include "my_macro.h"
 #include "my_func.h"
 #include <unistd.h>
+#include <netinet/tcp.h>
 
 
 
@@ -21,6 +22,7 @@ void CSocket::ngx_event_accept(lpngx_connection_t oldc)// 建立连接
     socklen = sizeof(mysockaddr);
     do
     {
+        Logger::ngx_log_stderr(0,"m_worker_connections %d ......", m_worker_connections);
         if(use_accept4)
         {
             // 因为listen套接字是非阻塞，所以即使完成连接队列为空，accept也不会阻塞
@@ -89,6 +91,22 @@ void CSocket::ngx_event_accept(lpngx_connection_t oldc)// 建立连接
                 return;
             }
         }
+
+
+        // 在连接建立后设置socket选项
+        int recv_buf_size = 2 * 1024 * 1024;  // 2MB
+        if(setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &recv_buf_size, sizeof(recv_buf_size))==-1)
+        {
+            Logger::ngx_log_stderr(errno,"setsockopt 在连接建立后设置socket选项 失败.");
+        }
+
+        // 启用TCP快速打开(TFO)
+        int qlen = 5; 
+        if(setsockopt(sockfd, SOL_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen))==-1)
+        {
+            Logger::ngx_log_stderr(errno,"setsockopt 启用TCP快速打开(TFO) 失败.");
+        }
+
         newc = ngx_get_connection(sockfd); // 从连接池中获得一个空闲连接
                                            //这是针对新连入用户的连接，和监听套接字 所对应的连接是两个不同的东西，不要搞混
         if(newc == NULL)
@@ -128,12 +146,12 @@ void CSocket::ngx_event_accept(lpngx_connection_t oldc)// 建立连接
             ngx_close_connection(newc);//关闭socket,这种可以立即回收这个连接，无需延迟，因为其上还没有数据收发，谈不到业务逻辑因此无需延迟；
             return; //直接返回
         }
-        
+        Logger::ngx_log_stderr(0,"ngx_event_accept bind 2222......");
         if(m_ifkickTimeCount == 1)
         {
             AddToTimmerQueue(newc);
         }
-
+        Logger::ngx_log_stderr(0,"ngx_event_accept bind 3333......");
     } while (1);
     
     return;

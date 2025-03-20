@@ -51,7 +51,6 @@ private:
 
 public:
 
-
 };
 
 } // namespace http

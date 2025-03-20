@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>POST测试</title>
+    <style>
+        .test-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+        }
+        #result {
+            margin-top: 1rem;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <input type="text" id="testInput" placeholder="输入测试内容">
+        <button onclick="submitTest()">提交测试</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function submitTest() {
+            const input = document.getElementById('testInput').value;
+            fetch('/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `testData=${encodeURIComponent(input)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').textContent = 
+                    `状态: ${data.status}\n消息: ${data.message}\n输入内容: ${data.input}`;
+            })
+            .catch(error => {
+                document.getElementById('result').textContent = '请求失败: ' + error;
+            });
+        }
+    </script>
+</body>
+</html>

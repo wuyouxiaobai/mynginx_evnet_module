@@ -1,5 +1,5 @@
 #pragma once
-
+#include <vector>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -8,8 +8,15 @@
 namespace WYXB
 {
 
+
 class HttpRequest
 {
+    friend class HttpContext;
+    struct FilePart {
+        std::string filename;
+        std::string content_type;
+        std::string data;
+    };
 public:
     enum Method
     {
@@ -83,6 +90,26 @@ private:
     std::map<std::string, std::string>           headers_; // 请求头
     std::string                                  content_; // 请求体
     uint64_t                                     contentLength_ { 0 }; // 请求体长度
+    std::vector<FilePart> files;
+    std::string boundary;
+
+public:  
+void setMultipartBoundary(const std::string& ct) {
+    size_t pos = ct.find("boundary=");
+    if (pos != std::string::npos) {
+        boundary = ct.substr(pos + 9);
+        if (boundary.front() == '"') 
+            boundary = boundary.substr(1, boundary.size()-2);
+    }
+}
+
+bool isMultipart() const {
+    auto it = headers_.find("content-type");
+    return it != headers_.end() && 
+           it->second.find("multipart/form-data") != std::string::npos;
+}
+
 };  
 
-} // namespace http
+
+} 
