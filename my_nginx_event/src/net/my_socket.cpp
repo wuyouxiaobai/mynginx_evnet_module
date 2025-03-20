@@ -393,14 +393,9 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
     msgHeader.pConn = pConn;
     msgHeader.iCurrsequence = pConn->iCurrsequence;
 
-    // 拼接消息头和消息体
-    size_t totalSize = sizeof(STRUC_MSG_HEADER) + psendbuf.size();
-    auto msgPtr = std::make_shared<std::vector<char>>(totalSize);
-    std::memcpy(msgPtr->data(), &msgHeader, sizeof(STRUC_MSG_HEADER));
-    std::memcpy(msgPtr->data() + sizeof(STRUC_MSG_HEADER), psendbuf.data(), psendbuf.size());
 
     // 加入发送队列
-    m_MsgSendQueue.emplace_back(msgPtr);
+    m_MsgSendQueue.emplace_back(msgHeader, psendbuf);
     ++m_iSendMsgQueueCount;
 
     // 发送信号量通知发送线程
@@ -451,6 +446,8 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 // 这个函数可能被多线程调用
 void CSocket::zdClosesocketProc(lpngx_connection_t p_Conn)
 {
+    // 从 epoll 中删除文件描述符 fd
+    ngx_epoll_oper_event(p_Conn->fd, EPOLL_CTL_DEL, 0, 0, p_Conn.get());
     if(m_ifkickTimeCount == 1) //是否开启踢人时钟，1：开启   0：不开启
     {
         DeleteFromTimerQueue(p_Conn); //从计时队列中删除该连接
@@ -631,11 +628,11 @@ int CSocket::ngx_epoll_oper_event(int fd,               //句柄，一个socket
         }
         pConn->events = ev.events;
     }
-    else
+    else if (eventtype == EPOLL_CTL_DEL)
     {
         //TODO: 删除红黑树节点
 
-        return 1;
+        // return 1;
     }
 
     ev.data.ptr = pConn;
@@ -700,6 +697,7 @@ int CSocket::ngx_epoll_process_events(int timer)
         auto Connptr = static_cast<ngx_connection_s*>(m_events[i].data.ptr);
         lpngx_connection_t pConn = Connptr->shared_from_this();
 
+
         //事件没有过期
         revents = m_events[i].events;
 
@@ -716,6 +714,7 @@ int CSocket::ngx_epoll_process_events(int timer)
             else
             {
                 Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，正常读事件.");
+                Logger::ngx_log_stderr(errno,"pConn %d, pConn->rhandlder %d, pConn id %d", &pConn, &(pConn->rhandler), pConn->id);
                 pConn->rhandler(pConn); 
             }
 
@@ -762,7 +761,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
     auto pThreadItem = static_cast<ThreadItem*>(threadData);
     auto pSocket = pThreadItem->_pThis.lock();
     if (!pSocket) return nullptr;
-
+    Logger::ngx_log_stderr(errno, "ServerSendQueueThread1...............");
     while (Server::instance().g_stopEvent == 0) {
         // 等待信号量
         if (sem_wait(&pSocket->m_semEventSendQueue) == -1 && errno != EINTR) {
@@ -770,88 +769,80 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
         }
 
         if (Server::instance().g_stopEvent != 0) break;
-
+        Logger::ngx_log_stderr(errno, "ServerSendQueueThread2...............");
         // 消息队列处理
         {
             std::lock_guard<std::mutex> lock(pSocket->m_sendMessageQueueMutex);
             auto it = pSocket->m_MsgSendQueue.begin();
             
             while (it != pSocket->m_MsgSendQueue.end()) {
-                auto& pMsgbuf = *it;
-                STRUC_MSG_HEADER header;
-                std::memcpy(&header, pMsgbuf->data(), sizeof(STRUC_MSG_HEADER));
-                lpngx_connection_t pConn;
-
+                std::string& buf = it->second;
+                STRUC_MSG_HEADER pMsghead = it->first;
                 // 消息头验证
-                if (pMsgbuf->size() < sizeof(STRUC_MSG_HEADER) || 
-                    !(pConn = header.pConn.lock()) || 
-                    pConn->iCurrsequence != header.iCurrsequence) 
+                if ( pMsghead.pConn->iCurrsequence != pMsghead.iCurrsequence) 
                 {
                     it = pSocket->m_MsgSendQueue.erase(it);
                     --pSocket->m_iSendMsgQueueCount;
                     continue;
                 }
 
-                // 消息处理核心逻辑
-                const size_t headerSize = sizeof(STRUC_MSG_HEADER);
-                std::string payload_str(
-                    pMsgbuf->data() + headerSize, 
-                    pMsgbuf->size() - headerSize
-                ); 
+                // // 消息处理核心逻辑
+                // const size_t headerSize = sizeof(STRUC_MSG_HEADER);
+                // std::string payload_str(
+                //     pMsgbuf->data() + headerSize, 
+                //     pMsgbuf->size() - headerSize
+                // ); 
 
                 // 发送处理
                 Buffer tmpbuf;
-                tmpbuf.append(payload_str.c_str(), payload_str.size());
+                tmpbuf.append(buf.c_str(), buf.size());
                 // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
-                ssize_t sendsize = pSocket->sendproc(pConn, tmpbuf);
+                ssize_t sendsize = pSocket->sendproc(pMsghead.pConn, tmpbuf);
                 // Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ServerSendQueueThread tmpbuf is: %s", tmpbuf.peek());
                 // 结果处理
                 if (sendsize > 0) {
                     if (sendsize == tmpbuf.readableBytes()) {
                         tmpbuf.retrieveAll();
                         // 仅在完整发送时检查400响应
-                        if (payload_str == "HTTP/1.1 400 Bad Request\r\n\r\n") {
-                            Logger::ngx_log_stderr(0, "发送400错误后关闭连接 fd=%d", pConn->fd);
-                            pSocket->zdClosesocketProc(pConn);
+                        if (buf == "HTTP/1.1 400 Bad Request\r\n\r\n") {
+                            Logger::ngx_log_stderr(0, "发送400错误后关闭连接 fd=%d", pMsghead.pConn->fd);
+                            pSocket->zdClosesocketProc(pMsghead.pConn);
                         }
-                        if(pConn->ishttpClose)
+                        if(pMsghead.pConn->ishttpClose)
                         {
-                            Logger::ngx_log_stderr(0, "服务器主动断开连接 fd=%d", pConn->fd);
-                            pSocket->zdClosesocketProc(pConn);
+                            Logger::ngx_log_stderr(0, "服务器主动断开连接 fd=%d", pMsghead.pConn->fd);
+                            pSocket->zdClosesocketProc(pMsghead.pConn);
                         }
                     } else {
                         tmpbuf.retrieve(sendsize);
                         // 添加新消息头到剩余数据前
-                        STRUC_MSG_HEADER newHeader{
-                            .pConn = pConn,
-                            .iCurrsequence = pConn->iCurrsequence
-                        };
-                        pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
-                        pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
-                        pSocket->ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD, 
-                                                    EPOLLOUT, 0, pConn.get());
+                        // STRUC_MSG_HEADER newHeader{
+                        //     .pConn = pConn,
+                        //     .iCurrsequence = pConn->iCurrsequence
+                        // };
+                        pMsghead.pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
+                        pMsghead.pConn->sendCount = pMsghead.iCurrsequence;
+                        pSocket->ngx_epoll_oper_event(pMsghead.pConn->fd, EPOLL_CTL_MOD, 
+                                                    EPOLLOUT, 0, pMsghead.pConn.get());
                         tmpbuf.retrieveAll(); 
                     }
                 } else if (sendsize == -1) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        STRUC_MSG_HEADER newHeader{
-                            .pConn = pConn,
-                            .iCurrsequence = pConn->iCurrsequence
-                        };
-                        pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
-                        pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
+
+                        pMsghead.pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
+                        pMsghead.pConn->sendCount = pMsghead.iCurrsequence;
                         // 发送缓冲区已满，保留未发送数据
-                        pSocket->ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD,
-                                                    EPOLLOUT, 0, pConn.get());
+                        pSocket->ngx_epoll_oper_event(pMsghead.pConn->fd, EPOLL_CTL_MOD,
+                                                    EPOLLOUT, 0, pMsghead.pConn.get());
                     } else {
                         // 其他错误处理（如ECONNRESET）
-                        pConn->psendbuf.retrieveAll();
-                        pSocket->zdClosesocketProc(pConn);
+                        pMsghead.pConn->psendbuf.retrieveAll();
+                        pSocket->zdClosesocketProc(pMsghead.pConn);
                         // CloseConnection(pConn);
                     }
                 } else {
-                    pConn->psendbuf.retrieveAll();
-                    pSocket->zdClosesocketProc(pConn);
+                    pMsghead.pConn->psendbuf.retrieveAll();
+                    pSocket->zdClosesocketProc(pMsghead.pConn);
                 }
 
                 // 移除已处理消息

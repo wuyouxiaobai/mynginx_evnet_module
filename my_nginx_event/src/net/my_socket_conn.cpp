@@ -25,6 +25,37 @@ ngx_connection_s::~ngx_connection_s()
 // 分配出去一个连接的时候初始化一些内容，原来的内容放在ngx_get_connection
 void ngx_connection_s::GetOneToUse(int sockfd)
 {
+    // 释放资源
+    // Socket 相关状态重置
+    // if(fd != -1)
+    // {
+    //     close(fd); // 关闭fd
+    //     fd = -1; // 标记fd为-1，表示连接已经关闭
+    // }
+    // listening = nullptr;            // 清空监听对象指针
+
+    // 协议控制字段重置
+    // memset(&s_sockaddr, 0, sizeof(sockaddr));  // 清空对端地址信息
+
+    // Epoll 事件相关清理
+    // rhandler = nullptr;             // 重置读事件处理器
+    // whandler = nullptr;             // 重置写事件处理器
+    // events = 0;                     // 清除事件标记
+
+    // 计时器状态重置
+    inRecyTime = {};                // C++11 统一初始化清零时间
+    lastPingTime = time_t{0};       // 明确初始化心跳时间
+
+    // 网络安全状态清理
+    FloodKickLastTime = 0;          // 重置攻击计时
+    FloodAttackCount = 0;           // 清空攻击计数器
+    iSendCount = 0;  //重置发送计数
+
+    // HTTP 协议标识重置
+    ishttpClose = true;  // 设置HTTP状态
+    // context_->reset();
+
+
     ++iCurrsequence;
     fd = sockfd;
     // fd = -1; // 还没有分配fd
@@ -66,35 +97,35 @@ void ngx_connection_s::PutOneToFree()
     // iThrowsendCount = 0;
 
     ++iCurrsequence; // 记录连接的序列号
-// 释放资源
-    // Socket 相关状态重置
-    if(fd != -1)
-    {
-        close(fd); // 关闭fd
-        fd = -1; // 标记fd为-1，表示连接已经关闭
-    }
-    listening = nullptr;            // 清空监听对象指针
+// // 释放资源
+//     // Socket 相关状态重置
+//     if(fd != -1)
+//     {
+//         close(fd); // 关闭fd
+//         fd = -1; // 标记fd为-1，表示连接已经关闭
+//     }
+//     listening = nullptr;            // 清空监听对象指针
 
-    // 协议控制字段重置
-    memset(&s_sockaddr, 0, sizeof(sockaddr));  // 清空对端地址信息
+//     // 协议控制字段重置
+//     memset(&s_sockaddr, 0, sizeof(sockaddr));  // 清空对端地址信息
 
-    // Epoll 事件相关清理
-    rhandler = nullptr;             // 重置读事件处理器
-    whandler = nullptr;             // 重置写事件处理器
-    events = 0;                     // 清除事件标记
+//     // Epoll 事件相关清理
+//     rhandler = nullptr;             // 重置读事件处理器
+//     whandler = nullptr;             // 重置写事件处理器
+//     events = 0;                     // 清除事件标记
 
-    // 计时器状态重置
-    inRecyTime = {};                // C++11 统一初始化清零时间
-    lastPingTime = time_t{0};       // 明确初始化心跳时间
+//     // 计时器状态重置
+//     inRecyTime = {};                // C++11 统一初始化清零时间
+//     lastPingTime = time_t{0};       // 明确初始化心跳时间
 
-    // 网络安全状态清理
-    FloodKickLastTime = 0;          // 重置攻击计时
-    FloodAttackCount = 0;           // 清空攻击计数器
-    iSendCount = 0;  //重置发送计数
+//     // 网络安全状态清理
+//     FloodKickLastTime = 0;          // 重置攻击计时
+//     FloodAttackCount = 0;           // 清空攻击计数器
+//     iSendCount = 0;  //重置发送计数
 
-    // HTTP 协议标识重置
-    ishttpClose = true;  // 设置HTTP状态
-    context_->reset();
+//     // HTTP 协议标识重置
+//     ishttpClose = true;  // 设置HTTP状态
+//     context_->reset();
    
 // 可选：内存缓冲区清理
     //    if (precvMemPointer) {          // 接收缓冲区清理
@@ -141,19 +172,21 @@ void CSocket::initconnection()
     // m_free_connection_n = m_total_connection_n = m_connectionList.size(); // 记录当前连接数
     // return;
 
-    // 使用智能指针管理连接对象
-    auto create_connection = [] {
-        lpngx_connection_t p_Conn = std::make_shared<ngx_connection_s>();;
-        // p_Conn->GetOneToUse(-1);
-        return p_Conn;
-    };
+    // // 使用智能指针管理连接对象
+    // auto create_connection = [] {
+    //     lpngx_connection_t p_Conn = std::make_shared<ngx_connection_s>();
+    //     // p_Conn->GetOneToUse(-1);
+    //     return p_Conn;
+    // };
 
-    // 预分配连接对象
-    m_connectionList.reserve(m_worker_connections);
+    // // 预分配连接对象
+    // m_connectionList.reserve(m_worker_connections);
     for (int i = 0; i < m_worker_connections; ++i) {
-        auto conn = create_connection();
-        m_connectionList.emplace_back(conn); // 总连接池
-        m_freeConnectionList.emplace_back(conn); // 空闲连接池
+        lpngx_connection_t p_Conn = std::make_shared<ngx_connection_s>();
+        p_Conn->GetOneToUse(-1);
+        p_Conn->id = i;
+        m_connectionList.emplace_back(p_Conn); // 总连接池
+        m_freeConnectionList.emplace_back(p_Conn); // 空闲连接池
     }
 
     // 更新计数
@@ -217,10 +250,10 @@ lpngx_connection_t CSocket::ngx_get_connection(int isock)
         p_Conn->GetOneToUse(isock);
         return p_Conn;
     };
-
+    Logger::ngx_log_stderr(0, "ngx_get_connection::m_free_connection_n: %d",  m_freeConnectionList.size()); 
     // 优先从空闲池获取连接
     if (!m_freeConnectionList.empty()) {
-        auto conn = m_freeConnectionList.front();
+        auto conn = m_freeConnectionList.front().lock();
         m_freeConnectionList.pop_front();
         --m_free_connection_n;
         conn->GetOneToUse(isock);
@@ -238,16 +271,16 @@ lpngx_connection_t CSocket::ngx_get_connection(int isock)
 }
 
 // 将连接放回连接池
-void CSocket::ngx_free_connection(lpngx_connection_t p_Conn)
+void CSocket::ngx_free_connection(std::weak_ptr<ngx_connection_s> p_Conn)
 {
     std::lock_guard<std::mutex> lock(m_connectionListMutex); // 临界区
-
-    p_Conn->PutOneToFree(); // 释放接受缓冲区和发送缓冲区
+    auto pConn = p_Conn.lock();
+    pConn->PutOneToFree(); // 释放接受缓冲区和发送缓冲区
 
     m_freeConnectionList.push_back(p_Conn); // 放回空闲连接池
 
     ++m_free_connection_n; // 空闲连接数加1
-
+    Logger::ngx_log_stderr(0, "m_free_connection_n: %d",  m_freeConnectionList.size()); 
     return;
 
 }
@@ -284,28 +317,42 @@ void CSocket::inRecyConnectQueue(lpngx_connection_t p_Conn)
 
 
 
+    // 空指针检查  
+    if (!p_Conn) return;  
 
-    if (!p_Conn) return;  // 空指针检查
+    // 使用锁保护临界区  
+    {  
+        std::lock_guard<std::mutex> lock(m_recyconnqueueMutex);  
 
-    // 存在性检查
+        // 检查是否已经在回收队列中  
+        auto it = std::find_if(m_recyconnectionList.begin(),   
+                                m_recyconnectionList.end(),   
+                                [&p_Conn](const std::weak_ptr<ngx_connection_s>&weak_conn) {  
+            auto existing_conn = weak_conn.lock();  
+            return existing_conn && existing_conn->id == p_Conn->id;  
+        });  
 
-    std::lock_guard<std::mutex> lock(m_recyconnqueueMutex);
-    auto it = std::find(m_recyconnectionList.begin(), m_recyconnectionList.end(), p_Conn);
-    if (it != m_recyconnectionList.end()) {  // 已经存在
-        Logger::ngx_log_stderr(0, "already in Recy queue and size: %d", m_recyconnectionList.size());
-        return;
-    }
-    
+        if (it != m_recyconnectionList.end()) {  
+            // 已经存在于回收队列  
+            Logger::ngx_log_stderr(0, "Connection already in Recy queue, size: %u",   
+                                    m_recyconnectionList.size());  
+            return;  
+        }  
 
-    //准备回收数据（无锁区）
-    p_Conn->inRecyTime = time(NULL);
-    ++p_Conn->iCurrsequence;
-    ++m_total_recyconnection_n;
-    --m_onlineUserCount;
+    // 准备回收数据  
+    p_Conn->inRecyTime = std::time(nullptr);  
+    ++p_Conn->iCurrsequence;  
 
-    // 最终提交
-    m_recyconnectionList.push_back(p_Conn);
-    Logger::ngx_log_stderr(0, "Recy queue size: %d", m_recyconnectionList.size());
+    // 原子操作更新计数  
+    std::atomic_fetch_sub(&m_total_recyconnection_n, 1);  
+    std::atomic_fetch_sub(&m_onlineUserCount, 1);  
+
+    // 使用弱指针添加到回收队列  
+    m_recyconnectionList.push_back(p_Conn);  
+
+
+    Logger::ngx_log_stderr(0, "Recy queue size: %u", m_recyconnectionList.size());  
+    }  
 
 
 }
@@ -396,49 +443,51 @@ void* CSocket::ServerRecyConnectionThread(void* threadData)
 //     return (void*)0;
 
 
-        
-    auto pThreadItem = static_cast<ThreadItem*>(threadData);
-    auto pSocket = pThreadItem->_pThis.lock();
-    if (!pSocket) return nullptr;
+Logger::ngx_log_stderr(errno, "ServerRecyConnectionThread..............."); 
+    auto pThreadItem = static_cast<ThreadItem*>(threadData);  
+    auto pSocket = pThreadItem->_pThis.lock();  
+    if (!pSocket) return nullptr;  
 
-    std::vector<lpngx_connection_t> batch_cleanup; // 批量处理容器
-    batch_cleanup.reserve(64); // 预分配空间
 
-    while (Server::instance().g_stopEvent == 0) {
-        // 每次直接休息200ms
+    while (Server::instance().g_stopEvent == 0) {  
+        // 使用条件变量等待  
         usleep(200 * 1000);
 
-        //定期回收处理
-        if (pSocket->m_total_connection_n > 0) {
-            auto currtime = time(NULL);
+        // 检查是否有活跃连接  
+        if (pSocket->m_total_connection_n > 0) {  
+            auto currtime = std::time(nullptr);  
             
-            // 批量提取待处理连接
-            {
-                std::lock_guard<std::mutex> lock(pSocket->m_recyconnqueueMutex);
-                auto& recyList = pSocket->m_recyconnectionList;
+            // 安全地提取过期连接  
+            {  
+                std::lock_guard<std::mutex> lock(pSocket->m_recyconnqueueMutex);  
                 
-                // 提取过期连接
-                auto expired = [&](auto conn) {
-                    return conn->inRecyTime + pSocket->m_RecyConnectionWaitTime <= currtime;
-                };
-                
-                std::copy_if(recyList.begin(), recyList.end(), 
-                        std::back_inserter(batch_cleanup), expired);
-                recyList.erase(std::remove_if(recyList.begin(), recyList.end(), expired), 
-                            recyList.end());
-            }
+                // 使用迭代器安全地处理弱指针  
+                for (auto it = pSocket->m_recyconnectionList.begin();   
+                    it != pSocket->m_recyconnectionList.end(); ) {  
+                    // 尝试获取共享指针  
+                    auto conn = it->lock();  
+                    
+                    // 检查连接是否有效且过期  
+                    if (!conn ||   
+                        (conn->inRecyTime + pSocket->m_RecyConnectionWaitTime <= currtime)) {  
 
-            //批量处理过期连接（无锁区）
-            for (auto conn : batch_cleanup) {
-                // if (conn->iThrowsendCount.load(std::memory_order_relaxed) > 0) {
-                //     ngx_log_stderr(0, "Unexpected send count: %d", 
-                //                 conn->iThrowsendCount.load());
-                // }
-                pSocket->ngx_free_connection(conn);
-            }
-            // Logger::ngx_log_error_core(NGX_LOG_INFO, 0 ,"Recying................");
-            batch_cleanup.clear();
-        }
+
+                        Logger::ngx_log_stderr(0, "test ,,, m_free_connection_n: ");
+                        pSocket->ngx_free_connection(*it);  
+
+
+                        // 安全地删除弱指针  
+                        Logger::ngx_log_stderr(0, "m_recyconnectionList: %d",  pSocket->m_recyconnectionList.size()); 
+                        it = pSocket->m_recyconnectionList.erase(it);  
+                    } else {  
+                        ++it;  
+                    }  
+                }  
+            }  
+
+
+        } 
+
 
         // // 程序退出处理
         // if (g_stopEvent != 0) {

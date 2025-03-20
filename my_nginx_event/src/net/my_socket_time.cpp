@@ -15,13 +15,13 @@ namespace WYXB
 void CSocket::AddToTimmerQueue(lpngx_connection_t pConn)
 { // 设置踢出时钟（向map中增加内容）
 
-    using MsgHeaderPtr = std::unique_ptr<STRUC_MSG_HEADER>;
+
     
     // 自动计算过期时间
     const auto expiration = time(nullptr) + m_iWaitTime; 
 
     // 自动内存管理
-    auto pMsgHeader = std::make_unique<STRUC_MSG_HEADER>();
+    auto pMsgHeader = std::make_shared<STRUC_MSG_HEADER>();
     pMsgHeader->pConn = pConn;
     pMsgHeader->iCurrsequence = pConn->iCurrsequence;
 
@@ -30,7 +30,7 @@ void CSocket::AddToTimmerQueue(lpngx_connection_t pConn)
         std::lock_guard<std::mutex> lock(m_timequeueMutex);
         
         // 自动排序容器
-        m_timeQueuemap.emplace(expiration, std::move(pMsgHeader));
+        m_timeQueuemap.emplace(expiration, pMsgHeader);
         
         m_cur_size_++; // 记录当前队列大小
         m_timer_value_ = GetEarliestTime();
@@ -164,7 +164,7 @@ void CSocket::DeleteFromTimerQueue(lpngx_connection_t pconn)
     std::multimap<time_t, LPSTRUC_MSG_HEADER>::iterator it = m_timeQueuemap.begin();
     while(it != m_timeQueuemap.end())
     {
-        if(it->second->pConn.lock() == pconn) {
+        if(it->second->pConn == pconn) {
             // unique_ptr自动释放内存
             it = m_timeQueuemap.erase(it);  // C++11起erase返回下一个迭代器
             m_cur_size_--;
@@ -216,11 +216,12 @@ void CSocket::clearAllFromTimerQueue()
 void* CSocket::ServerTimerQueueMonitorThread(void* threadData)
 {
     auto pThreadItem = static_cast<ThreadItem*>(threadData);
-    if(pThreadItem->_pThis.lock() == nullptr)
+    std::shared_ptr<CSocket> pSocket = pThreadItem->_pThis.lock();
+    if(pSocket == nullptr)
     {
         return nullptr;
     }
-    std::shared_ptr<CSocket> pSocket = pThreadItem->_pThis.lock();
+
     time_t absolute_time, curr_time;
     int err;
 

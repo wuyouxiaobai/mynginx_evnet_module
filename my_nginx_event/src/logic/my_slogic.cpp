@@ -63,35 +63,26 @@ void CLogicSocket::registCallback(HttpRequest::Method method, const std::string 
 
 
 //处理接收消息队列中的消息，由线程池调用
-void CLogicSocket::threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf)
+void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::string pMsgBuf)
 {
     Logger::ngx_log_stderr(0, "threadRecvProcFunc ing。。。。。。。。");
-    // 检查缓冲区大小是否至少包含头部
-    if (pMsgBuf.size() < sizeof(STRUC_MSG_HEADER)) {
-        Logger::ngx_log_stderr(0, "Buffer size is smaller than the header size.");
-        throw std::runtime_error("Buffer size is smaller than the header size.");
-    }
 
-    // 提取头部
-    STRUC_MSG_HEADER header;
-    std::memcpy(&header, pMsgBuf.data(), sizeof(STRUC_MSG_HEADER));
 
-    // 提取数据体
-    size_t headerSize = sizeof(STRUC_MSG_HEADER);
-    size_t dataSize = pMsgBuf.size() - headerSize;
+    // // 提取数据体
+    // size_t headerSize = sizeof(STRUC_MSG_HEADER);
+    // size_t dataSize = pMsgBuf.size() - headerSize;
 
-    if (dataSize > 0) {
-        std::string dataBody(pMsgBuf.begin() + headerSize, pMsgBuf.end());
+    if (pMsgBuf.size() > 0) {
         bool isErr = false; // 判断是否解析失败
-        lpngx_connection_t headptr =  header.pConn.lock();
-        if(!headptr || headptr->iCurrsequence != header.iCurrsequence) // 连接已经断开
+        lpngx_connection_t headptr =  msghead.pConn;
+        if(headptr->iCurrsequence != msghead.iCurrsequence) // 连接已经断开
         {
             Logger::ngx_log_stderr(0, "连接已经断开。。。。。。。。。");
             return;
         }    
 
         Logger::ngx_log_stderr(0, "解析前1。。。。。。。。。");
-        bool ok = headptr->context_->parseRequest(dataBody, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
+        bool ok = headptr->context_->parseRequest(pMsgBuf, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
         Logger::ngx_log_stderr(0, "解析前2。。。。。。。。。");
         if(!ok) // 未完成解析
         {

@@ -16,6 +16,7 @@ namespace WYXB
 // http请求报文到来时的回调
 void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
 {
+    Logger::ngx_log_stderr(0, "test!!!!!!!!!!!!!!!!!!!!");
     auto logConnectionError = [pConn](int errcode, const char* msg) {
         char ip[INET6_ADDRSTRLEN] = "unknown"; // 扩展支持IPv6
         uint16_t port = 0;
@@ -33,29 +34,28 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
         Logger::ngx_log_stderr(errcode, "%s [%s]:%d (family:%d)", 
                       msg, ip, port, pConn->s_sockaddr.sa_family);
     };
-
+    Logger::ngx_log_stderr(0, "test!!!!!!!!!!!!!!!!!!!!");
     // 创建消息缓冲区（头部+最大数据空间）
-    std::vector<uint8_t> buffer(sizeof(STRUC_MSG_HEADER) + 4* 1024 * 1024);
 
-    // 在缓冲区头部构造消息头（使用placement new）
-    auto* header = new (buffer.data()) STRUC_MSG_HEADER{
-        .pConn = pConn,
-        .iCurrsequence = pConn->iCurrsequence
-    };
+    std::vector<char> buffer(4* 1024 * 1024);
+    Logger::ngx_log_stderr(0, "test2!!!!!!!!!!!!!!!!!!!!");
 
     // 接收网络数据
     const ssize_t n = recv(
         pConn->fd,
-        reinterpret_cast<char*>(buffer.data()) + sizeof(STRUC_MSG_HEADER),
+        buffer.data(),
         4* 1024 * 1024,
         0
     );
-
+    Logger::ngx_log_stderr(0, "test3!!!!!!!!!!!!!!!!!!!!");
     // 处理接收结果
     if (n > 0) {
-        buffer.resize(sizeof(STRUC_MSG_HEADER) + n);
-        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "recv msg %s", buffer.data() + sizeof(STRUC_MSG_HEADER));
-        Server::instance().g_threadpool->inMsgRecvQueueAndSignal(std::move(buffer));
+        buffer.resize(n);
+        Logger::ngx_log_error_core(NGX_LOG_NOTICE, 0, "recv msg %s", buffer.data());
+        STRUC_MSG_HEADER msghead;
+        msghead.iCurrsequence = pConn->iCurrsequence;
+        msghead.pConn = pConn;
+        Server::instance().g_threadpool->inMsgRecvQueueAndSignal(msghead, buffer.data());
         return;
     }
 
@@ -146,37 +146,22 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
 
 // todo...............
 
-    auto pMsgbuf = pConn->psendbuf;
-    STRUC_MSG_HEADER header;
-    std::memcpy(&header, pMsgbuf.peek(), sizeof(STRUC_MSG_HEADER));
-    // lpngx_connection_t pConn;
-
     // 消息头验证
     // 确保连接有效性和数据完整性检查
-    if (!pConn || pConn->fd == -1 || pConn->psendbuf.readableBytes() == 0 || pConn->iCurrsequence != header.iCurrsequence) {
+    if (!pConn || pConn->fd == -1 || pConn->psendbuf.readableBytes() == 0 || pConn->iCurrsequence != pConn->sendCount) {
         Logger::ngx_log_stderr(0, "非法连接或空发送缓冲区");
         return;
     }
 
-    // 消息处理核心逻辑
-    const size_t headerSize = sizeof(STRUC_MSG_HEADER);
-    std::string payload_str(
-        pMsgbuf.peek() + headerSize, 
-        pMsgbuf.readableBytes() - headerSize
-    ); 
     
-    // 发送处理
-    Buffer tmpbuf;
-    tmpbuf.append(payload_str.c_str(), payload_str.size());
-    pConn->psendbuf.retrieveAll();
     // 循环发送直到缓冲区空或出现EAGAIN
     while (true) {
         // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
-        ssize_t sendsize = sendproc(pConn, tmpbuf);
+        ssize_t sendsize = sendproc(pConn, pConn->psendbuf);
         // ssize_t sendsize = sendproc(pConn, pConn->psendbuf);
-        Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ngx_http_write_response_handler 发送数据长度：%d, 发送数据: %s", sendsize, tmpbuf.peek());
+        Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ngx_http_write_response_handler 发送数据长度：%d, 发送数据: %s", sendsize, pConn->psendbuf.peek());
         if (sendsize > 0) {
-            tmpbuf.retrieve(sendsize);
+            pConn->psendbuf.retrieve(sendsize);
             // 检查是否发送完成
             if (pConn->psendbuf.readableBytes() == 0) 
             {
@@ -198,12 +183,6 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK) 
             {
-                STRUC_MSG_HEADER newHeader{
-                    .pConn = pConn,
-                    .iCurrsequence = pConn->iCurrsequence
-                };
-                pConn->psendbuf.append((char*)&newHeader, sizeof(STRUC_MSG_HEADER));
-                pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
                 // 注册可写事件继续发送
                 ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD,
                                 EPOLLOUT, 0, pConn.get());

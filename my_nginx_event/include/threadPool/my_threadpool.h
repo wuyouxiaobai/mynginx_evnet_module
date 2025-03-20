@@ -17,7 +17,7 @@ namespace WYXB
 
 class CThreadPool : public std::enable_shared_from_this<CThreadPool>
 {
-    using Message = std::vector<uint8_t>;
+    using Message = std::string;
 public:
     CThreadPool();
 
@@ -27,7 +27,7 @@ public:
     bool Create(int threadNum);
     void StopAll(); // 使线程池中的所有线程停止并退出
 
-    void inMsgRecvQueueAndSignal(std::vector<uint8_t>&& buf);// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
+    void inMsgRecvQueueAndSignal(STRUC_MSG_HEADER msghead, std::string buf);// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
     void Call(); //唤醒线程
 
     int getRecvMsgQueueCount(){return m_iRecvMsgQueueCount;} // 获取接收到的消息队列的数量
@@ -69,7 +69,7 @@ private:
 
     // 接受消息队列
     std::mutex m_pthreadMutex; // 互斥锁
-    std::deque<Message> m_MsgRecvQueue; // 接收到的消息队列
+    std::list<std::pair<STRUC_MSG_HEADER, std::string>> m_MsgRecvQueue; // 接收到的消息队列
     std::atomic<int> m_iRecvMsgQueueCount{0}; // 接收到的消息队列的数量
     
 

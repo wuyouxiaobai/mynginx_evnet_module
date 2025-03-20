@@ -138,11 +138,11 @@ void CThreadPool::StopAll() // 使线程池中的所有线程停止并退出
 
 }
 
-void CThreadPool::inMsgRecvQueueAndSignal(std::vector<uint8_t>&& buf)// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
+void CThreadPool::inMsgRecvQueueAndSignal(STRUC_MSG_HEADER msghead, std::string buf)// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
 {
     {
         std::lock_guard<std::mutex> lock(m_pthreadMutex);
-        m_MsgRecvQueue.emplace_back(std::move(buf)); // 移动而非拷贝
+        m_MsgRecvQueue.emplace_back(std::pair<STRUC_MSG_HEADER, std::string>(msghead, buf)); 
         ++m_iRecvMsgQueueCount; // 原子操作，无需锁
     }
     Call();
@@ -183,6 +183,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
     {
 
         Message buf;
+        STRUC_MSG_HEADER msghead;
         {
             std::unique_lock<std::mutex> lock(pThreadPool->m_pthreadMutex);
             if(pThread->ifrunning == false)
@@ -197,7 +198,8 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
 
             if(shutdown) break;
             
-            buf = std::move(pThreadPool->m_MsgRecvQueue.front());
+            buf = pThreadPool->m_MsgRecvQueue.front().second;
+            msghead = pThreadPool->m_MsgRecvQueue.front().first;
             pThreadPool->m_MsgRecvQueue.pop_front();
             pThreadPool->m_iRecvMsgQueueCount.fetch_sub(1, std::memory_order_relaxed);
         }
@@ -208,7 +210,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
         try {
             if (!buf.empty()) {
                 Logger::ngx_log_stderr(0, "threadRecvProcFunc start!");
-                Server::instance().g_socket->threadRecvProcFunc(std::move(buf));
+                Server::instance().g_socket->threadRecvProcFunc(msghead, buf);
             }
         } catch(...) {
             Logger::ngx_log_stderr(0, "异常处理........");

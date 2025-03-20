@@ -19,6 +19,7 @@
 
 
 
+
 #define NGX_LISTEN_BACKLOG 511 // 已完成连接队列，nginx给511，我们也先按照这个来：不懂这个数字的同学参考第五章第四节
 #define NGX_MAX_EVENTS 512     // epoll_wait一次最多接收这么多个事件，nginx中缺省是512，我们这里固定给成512就行，没太大必要修改
 
@@ -48,7 +49,7 @@ using ngx_event_handler = std::function<void(lpngx_connection_t)>;
 // // 消息头，引入的目的是当收到数据包时，额外记录一些内容以备将来使用
 typedef struct _STRUC_MSG_HEADER
 {
-    std::weak_ptr<ngx_connection_s> pConn;  // 使用智能指针
+    lpngx_connection_t pConn;  // 使用智能指针
     uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
     //......其他以后扩展
 } STRUC_MSG_HEADER;
@@ -175,7 +176,9 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
 
 
 // http相关
+
     std::shared_ptr<HttpContext> context_; // 解析并暂存的http请求报文
+    int sendCount{0};
     Buffer psendbuf;
     std::atomic_bool ishttpClose{true};
 
@@ -183,6 +186,8 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
 // 多线程互斥
     std::mutex mtx;
 
+// test id
+    int id;
 
 // 删除拷贝操作，允许移动操作
     ngx_connection_s(const ngx_connection_s&) = delete;
@@ -217,7 +222,7 @@ public:
 
     void printTDInfo(); // 打印统计信息
 public:
-    virtual void threadRecvProcFunc(std::vector<uint8_t>&& pMsgBuf){}; // 处理http请求
+    virtual void threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::string pMsgBuf){}; // 处理http请求
     virtual void procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t currTime); // 心跳包检测时间到，去检测心跳包是否超时，本函数只释放内存，子函数应该重写具体操作
 
 public:
@@ -259,7 +264,7 @@ private:
     void initconnection(); // 初始化连接池
     void clearconnection(); // 清理连接池
     lpngx_connection_t ngx_get_connection(int isock); // 从连接池获得一个空闲连接
-    void ngx_free_connection(lpngx_connection_t pConn); // 将连接放回连接池
+    void ngx_free_connection(std::weak_ptr<ngx_connection_s> pConn); // 将连接放回连接池
     void inRecyConnectQueue(lpngx_connection_t pConn); // 将要回收的连接放到一个队列里
 
     // 和时间相关
@@ -308,12 +313,12 @@ private:
 
     //连接池相关
     std::vector<lpngx_connection_t> m_connectionList; // 连接列表【连接池】
-    std::deque<lpngx_connection_t> m_freeConnectionList; // 空闲连接列表【装的全是空闲连接】
+    std::deque<std::weak_ptr<ngx_connection_s>> m_freeConnectionList; // 空闲连接列表【装的全是空闲连接】
     std::atomic<int> m_total_connection_n; // 连接池总数量
     std::atomic<int> m_free_connection_n; // 空闲连接数量
     std::mutex m_connectionListMutex; // 连接池互斥锁
     std::mutex m_recyconnqueueMutex; // 回收连接队列互斥锁
-    std::vector<lpngx_connection_t> m_recyconnectionList; // 回收连接队列
+    std::list<std::weak_ptr<ngx_connection_s>> m_recyconnectionList; // 回收连接队列
     std::atomic<int> m_total_recyconnection_n;// 待回收连接队列大小
     int m_RecyConnectionWaitTime; // 等待一段时间才回收连接【慢回收？】
 
@@ -321,7 +326,7 @@ private:
     struct epoll_event m_events[NGX_MAX_EVENTS]; // epoll_wait中接受返回的所发生的事件
 
     // 消息队列
-    std::list<std::shared_ptr<std::vector<char>>> m_MsgSendQueue; // 发送数据消息队列
+    std::list<std::pair<STRUC_MSG_HEADER, std::string>> m_MsgSendQueue; // 发送数据消息队列
     std::atomic<int> m_iSendMsgQueueCount; // 发送消息队列大小
 
     // 多线程相关
