@@ -446,14 +446,15 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 // 这个函数可能被多线程调用
 void CSocket::zdClosesocketProc(lpngx_connection_t p_Conn)
 {
-    // 从 epoll 中删除文件描述符 fd
-    ngx_epoll_oper_event(p_Conn->fd, EPOLL_CTL_DEL, 0, 0, p_Conn.get());
+
     if(m_ifkickTimeCount == 1) //是否开启踢人时钟，1：开启   0：不开启
     {
         DeleteFromTimerQueue(p_Conn); //从计时队列中删除该连接
     }
     if(p_Conn->fd != -1)
     {
+        // 从 epoll 中删除文件描述符 fd
+        ngx_epoll_oper_event(p_Conn->fd, EPOLL_CTL_DEL, 0, 0, p_Conn.get());
         close(p_Conn->fd); //关闭socket后，epoll就会被从红黑树中删除，之后就无法收到任何epoll事件
         p_Conn->fd = -1; // 标记该连接已经关闭
     }

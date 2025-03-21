@@ -100,7 +100,7 @@ void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::string pMsg
         // 成功解析，处理数据体  
         Logger::ngx_log_stderr(0, "onRequest前1。。。。。。。。。");
         onRequest(headptr, headptr->context_->request());
-        // headptr->context_->reset();
+        headptr->context_->reset();
         Logger::ngx_log_stderr(0, "成功解析，处理数据体");
     } else {
         Logger::ngx_log_stderr(0, "No data body present.");

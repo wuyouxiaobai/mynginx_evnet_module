@@ -53,7 +53,7 @@ void ngx_connection_s::GetOneToUse(int sockfd)
 
     // HTTP 协议标识重置
     ishttpClose = true;  // 设置HTTP状态
-    // context_->reset();
+    context_->reset();
 
 
     ++iCurrsequence;
@@ -245,29 +245,38 @@ lpngx_connection_t CSocket::ngx_get_connection(int isock)
     std::lock_guard<std::mutex> lock(m_connectionListMutex);
 
     // 连接创建
-    auto create_connection = [isock] {
-        lpngx_connection_t p_Conn;
-        p_Conn->GetOneToUse(isock);
-        return p_Conn;
-    };
-    Logger::ngx_log_stderr(0, "ngx_get_connection::m_free_connection_n: %d",  m_freeConnectionList.size()); 
-    // 优先从空闲池获取连接
-    if (!m_freeConnectionList.empty()) {
-        auto conn = m_freeConnectionList.front().lock();
-        m_freeConnectionList.pop_front();
-        --m_free_connection_n;
-        conn->GetOneToUse(isock);
-        ++m_onlineUserCount; 
-        return conn;
-    }
+    do{
+        auto create_connection = [&] {
+            for (int i = 0; i < m_worker_connections; ++i) {
+                lpngx_connection_t p_Conn = std::make_shared<ngx_connection_s>();
+                p_Conn->GetOneToUse(-1);
+                p_Conn->id = i + m_total_connection_n;
+                m_connectionList.emplace_back(p_Conn); // 总连接池
+                m_freeConnectionList.emplace_back(p_Conn); // 空闲连接池
+                ++m_free_connection_n;
+            }
+            // 更新计数
+            m_total_connection_n = m_connectionList.size();
+        };
+        Logger::ngx_log_stderr(0, "ngx_get_connection::m_free_connection_n: %d",  m_freeConnectionList.size()); 
+        // 优先从空闲池获取连接
+        if (!m_freeConnectionList.empty()) {
+            auto conn = m_freeConnectionList.front().lock();
+            m_freeConnectionList.pop_front();
+            --m_free_connection_n;
+            conn->GetOneToUse(isock);
+            ++m_onlineUserCount; 
+            return conn;
+        }
+    
+    
+    
+        // 创建新连接
+        create_connection();
+    }while (true);
 
-    // 创建新连接
-    auto conn = create_connection();
-    m_connectionList.emplace_back(conn);
-    ++m_total_connection_n; 
-    conn->GetOneToUse(isock);
-    ++m_onlineUserCount; 
-    return conn;
+
+
 }
 
 // 将连接放回连接池
