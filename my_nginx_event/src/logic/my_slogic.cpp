@@ -80,9 +80,21 @@ void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint
             Logger::ngx_log_stderr(0, "连接已经断开。。。。。。。。。");
             return;
         }    
-
+        bool ok = false;
         Logger::ngx_log_stderr(0, "解析前1。。。。。。。。。");
-        bool ok = headptr->context_->parseRequest(pMsgBuf, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
+        {
+            std::unique_lock<std::mutex> lock(headptr->mtx_context_);
+            // 循环等待条件满足，避免虚假唤醒
+            headptr->cv_context_.wait(lock, [&]() { 
+                return headptr->context_->sequence == msghead.sequence; 
+            });
+
+            ok = headptr->context_->parseRequest(pMsgBuf, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
+            headptr->context_->sequence++;
+            headptr->cv_context_.notify_one(); // 或 notify_all()
+        }
+        
+
         Logger::ngx_log_stderr(0, "解析前2。。。。。。。。。");
         if(!ok) // 未完成解析
         {

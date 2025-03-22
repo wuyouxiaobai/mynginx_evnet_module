@@ -54,6 +54,9 @@ private:
     std::vector<uint8_t> buffer_;       // 持久化接收缓冲区
     size_t parsed_pos_ = 0;     // 已解析位置
     size_t body_bytes_received_ = 0; //记录已接收的Body字节数
+public:
+
+    uint sequence{0}; // 期待解析的数据包的序号
 
 public:
 

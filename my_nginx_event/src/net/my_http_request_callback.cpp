@@ -55,6 +55,8 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
         STRUC_MSG_HEADER msghead;
         msghead.iCurrsequence = pConn->iCurrsequence;
         msghead.pConn = pConn;
+        msghead.sequence = pConn->sequence;
+        pConn->sequence++;
         Server::instance().g_threadpool->inMsgRecvQueueAndSignal(msghead, buffer);
         return;
     }

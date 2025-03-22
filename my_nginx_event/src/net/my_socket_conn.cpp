@@ -54,7 +54,7 @@ void ngx_connection_s::GetOneToUse(int sockfd)
     // HTTP 协议标识重置
     ishttpClose = true;  // 设置HTTP状态
     context_->reset();
-
+    sequence = 0;
 
     ++iCurrsequence;
     fd = sockfd;

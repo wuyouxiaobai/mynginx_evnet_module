@@ -16,6 +16,7 @@
 #include <functional>
 #include "Buffer.h"
 #include "my_logger.h"
+#include <condition_variable>
 
 
 
@@ -51,6 +52,7 @@ typedef struct _STRUC_MSG_HEADER
 {
     lpngx_connection_t pConn;  // 使用智能指针
     uint64_t iCurrsequence;   // 收到数据包时记录对应连接的序号，将来能用于比较是否连接已经作废用
+    uint sequence{0};
     //......其他以后扩展
 } STRUC_MSG_HEADER;
 using LPSTRUC_MSG_HEADER = std::shared_ptr<STRUC_MSG_HEADER>;
@@ -176,12 +178,14 @@ struct ngx_connection_s : public std::enable_shared_from_this<ngx_connection_s>
 
 
 // http相关
-
+    std::mutex mtx_context_;
+    std::condition_variable cv_context_;
     std::shared_ptr<HttpContext> context_; // 解析并暂存的http请求报文
     int sendCount{0};
     Buffer psendbuf;
     std::atomic_bool ishttpClose{true};
 
+    uint sequence{0}; // 用来在多线程下重载数据分片
 
 // 多线程互斥
     std::mutex mtx;
