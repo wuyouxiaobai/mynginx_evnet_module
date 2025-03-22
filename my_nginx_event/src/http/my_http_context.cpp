@@ -7,9 +7,12 @@ namespace WYXB
 {
 
 // 将报文解析出来将关键信息封装到HttpRequest对象里面去
-bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system_clock::time_point receiveTime)
+bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chrono::system_clock::time_point receiveTime)
 {
-    buffer_.append(buf);
+    if (!buf.empty()) {
+        Logger::ngx_log_stderr(0, "parseRequest 中 buf ： %s", buf);
+        buffer_.insert(buffer_.end(), buf.begin(), buf.end());
+    }
     bool ok = true;
     isErr = false;
     Logger::ngx_log_stderr(0, "parseRequest...................");
@@ -17,7 +20,16 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
         switch(state_) {
             case kExpectRequestLine: {
                 Logger::ngx_log_stderr(0, "kExpectRequestLine...................");
-                size_t crlf = buffer_.find("\r\n", parsed_pos_);
+                // 定义要查找的 CRLF（"\r\n"）模式
+                const uint8_t crlf_pattern[] = {'\r', '\n'}; // 二进制形式的 "\r\n"
+                // 计算查找范围
+                auto start = buffer_.begin() + parsed_pos_;
+                auto end = buffer_.end();
+                // 使用 std::search 查找子序列
+                auto found = std::search(start, end, 
+                                        std::begin(crlf_pattern), std::end(crlf_pattern));
+                // 计算位置或标记未找到
+                size_t crlf = (found != end) ? (found - buffer_.begin()) : std::string::npos;
                 if (crlf != std::string::npos) {
                     // 请求行长度超过1KB视为攻击尝试
                     if (crlf - parsed_pos_ > 1024) { 
@@ -27,8 +39,8 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
                     }
                     
                     
-                    ok = processRequestLine(buffer_.data()+parsed_pos_, 
-                                            buffer_.data()+crlf);
+                    ok = processRequestLine(    reinterpret_cast<const char*>(buffer_.data()) + parsed_pos_, 
+                                                reinterpret_cast<const char*>(buffer_.data()) + crlf    ) ;
                     if (ok) {
                         request_.setReceiveTime(receiveTime);
                         parsed_pos_ = crlf + 2;
@@ -45,7 +57,16 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
             case kExpectHeaders: {
                 Logger::ngx_log_stderr(0, "kExpectHeaders...................");
                 while(parsed_pos_ < buffer_.size()) {
-                    size_t crlf = buffer_.find("\r\n", parsed_pos_);
+                    // 定义要查找的 CRLF（"\r\n"）模式
+                    const uint8_t crlf_pattern[] = {'\r', '\n'}; // 二进制形式的 "\r\n"
+                    // 计算查找范围
+                    auto start = buffer_.begin() + parsed_pos_;
+                    auto end = buffer_.end();
+                    // 使用 std::search 查找子序列
+                    auto found = std::search(start, end, 
+                                            std::begin(crlf_pattern), std::end(crlf_pattern));
+                    // 计算位置或标记未找到
+                    size_t crlf = (found != end) ? (found - buffer_.begin()) : std::string::npos;
                     if (crlf == std::string::npos) break;
 
                     // 空行检测
@@ -80,8 +101,8 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
                         memchr(buffer_.data() + parsed_pos_, ':', crlf - parsed_pos_));
                     if (colon) {
                         // Header解析
-                        std::string key(buffer_.data() + parsed_pos_, colon - (buffer_.data() + parsed_pos_)); // 使用长度构造
-                        std::string val(colon + 1, (buffer_.data() + crlf) - (colon + 1)); // 使用迭代器构造
+                        std::string key(reinterpret_cast<const char*>(buffer_.data()) + parsed_pos_, colon - (reinterpret_cast<const char*>(buffer_.data()) + parsed_pos_)); // 使用长度构造
+                        std::string val(colon + 1, (reinterpret_cast<const char*>(buffer_.data()) + crlf) - (colon + 1)); // 使用迭代器构造
                         request_.addHeader(
                             std::move(key.erase(key.find_last_not_of(" \t") + 1)),
                             std::move(val.erase(0, val.find_first_not_of(" \t")))
@@ -92,26 +113,191 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
                     }
                     parsed_pos_ = crlf + 2;
                 }
+                // 检查 Content-Type 头
+                std::string contentType = request_.getHeader("Content-Type");
+                if (!contentType.empty())
+                {
+                    // 如果是 multipart/form-data，则需要提取 boundary
+                    if (contentType.find("multipart/form-data") != std::string::npos)
+                    {
+                        // 查找 boundary 参数
+                        size_t pos = contentType.find("boundary=");
+                        if (pos != std::string::npos)
+                        {
+                            std::string boundary = contentType.substr(pos + 9);
+                            // boundary 可能会带引号，去除引号
+                            if (!boundary.empty() && boundary.front() == '\"')
+                            {
+                                boundary.erase(0, 1);
+                                if (!boundary.empty() && boundary.back() == '\"')
+                                    boundary.pop_back();
+                            }
+                            // 将 boundary 保存到 request_ 或相关对象中，供后续解析请求体时使用
+                            request_.setBoundary(boundary); // 假设你有这样的方法
+                        }
+                        else
+                        {
+                            // 如果 multipart/form-data 却没有 boundary，则视为非法请求
+                            isErr = true;
+                            ok = false;
+                        }
+                    }
+                }
+
                 break;
             }
             
             case kExpectBody: {
                 Logger::ngx_log_stderr(0, "kExpectBody...................");
-                size_t needed = request_.contentLength();
-                size_t remaining = buffer_.size() - parsed_pos_;
-                
-                if (remaining >= needed) {
-                    request_.setBody(buffer_.substr(parsed_pos_, needed));
-                    parsed_pos_ += needed;
-                    state_ = kGotAll;
+
+                 // 先检查是否有 multipart 的 boundary
+                std::string boundary = request_.boundary();
+                if (boundary.empty()) {
+                    Logger::ngx_log_stderr(0, "没有 boundary，则按普通 body 解析...................");
+                    // 没有 boundary，则按普通 body 解析
+                    size_t needed = request_.contentLength();
+                    size_t remaining = buffer_.size() - parsed_pos_;
+                    size_t bytes_to_copy = std::min(remaining, needed - body_bytes_received_);
+                    
+                    request_.appendBody(reinterpret_cast<const char*>(buffer_.data()) + parsed_pos_, bytes_to_copy);
+                    parsed_pos_ += bytes_to_copy;
+                    body_bytes_received_ += bytes_to_copy;
+                    if (body_bytes_received_ >= needed) {
+                        state_ = kGotAll;
+                    } else {
+                        ok = false; // 需要更多数据
+                    }
                 } else {
-                    state_ = kExpectBody;
-                    ok = false; // 标记已处理到当前末尾
+                    Logger::ngx_log_stderr(0, "有 boundary，则按 multipart/form-data 解析上传内容..................");
+                    // 有 boundary，则按 multipart/form-data 解析上传内容
+                    size_t needed = request_.contentLength();
+                    std::string boundary_delim = "--" + boundary;        // 正常 boundary
+                    std::string boundary_end = "--" + boundary + "--";     // 结束 boundary
+                    while (parsed_pos_ < buffer_.size()) {
+                        // 查找边界位置（替换原始 find 逻辑）
+                        auto search = buffer_.begin() + parsed_pos_;
+                        auto boundary_it = std::search(
+                            search, buffer_.end(),
+                            boundary_delim.begin(), boundary_delim.end()
+                        );
+                        size_t boundary_pos = (boundary_it != buffer_.end()) 
+                            ? std::distance(buffer_.begin(), boundary_it) 
+                            : std::string::npos;
+                        if (boundary_pos == std::string::npos) {
+                            // 没有找到完整的 Part，等待更多数据
+                            ok = false;
+                            break;
+                        }
+
+                        size_t part_start = boundary_pos + boundary_delim.size();
+                        // 检查是否为结束 boundary
+                        // 预定义结束边界标记（--）
+                        constexpr std::array<uint8_t, 2> BOUNDARY_END_MARK = {'-', '-'};
+
+                        // 安全比较逻辑
+                        if (part_start + BOUNDARY_END_MARK.size() <= buffer_.size()) {
+                            auto part_begin = buffer_.begin() + part_start;
+                            auto part_end = part_begin + BOUNDARY_END_MARK.size();
+                            
+                            // 使用 std::equal 进行二进制比较
+                            if (std::equal(part_begin, part_end, BOUNDARY_END_MARK.begin())) {
+                                state_ = kGotAll;  // 所有 Part 已解析完成
+                                break;
+                            }
+                        }
+
+                        // 跳过 CRLF
+                        // 预定义 CRLF 常量（放在类或全局作用域）
+                        constexpr std::array<uint8_t, 2> CRLF = {'\r', '\n'}; // 二进制形式的 "\r\n"
+
+                        // 安全检查与比较逻辑
+                        if (part_start + CRLF.size() <= buffer_.size()) {
+                            auto start = buffer_.begin() + part_start;
+                            if (std::equal(start, start + CRLF.size(), CRLF.begin())) {
+                                part_start += CRLF.size(); // 安全跳过 CRLF
+                            }
+                        }
+
+                        // 解析 Part 头部
+                        // 预定义 CRLFCRLF 模式（\r\n\r\n）
+                        constexpr std::array<uint8_t, 4> CRLF_CRLF = {'\r', '\n', '\r', '\n'};
+
+                        // 计算查找范围（安全检查已省略，需确保 part_start <= buffer_.size()）
+                        auto search_start = buffer_.begin() + part_start;
+                        auto search_end = buffer_.end();
+
+                        // 使用 std::search 查找子序列
+                        auto found = std::search(search_start, search_end, 
+                                                CRLF_CRLF.begin(), CRLF_CRLF.end());
+
+                        // 计算位置或标记未找到
+                        size_t header_end = (found != search_end) 
+                            ? std::distance(buffer_.begin(), found) 
+                            : std::string::npos;
+                        if (header_end == std::string::npos) {
+                            // 不完整的 Part 头部，等待更多数据
+                            ok = false;
+                            break;
+                        }
+
+                        // 提取头部信息
+                        std::string part_header(reinterpret_cast<const char*>(buffer_.data()) + part_start, header_end - part_start);
+                        part_start = header_end + 4; // 跳过头部和空行
+
+                        // 解析 Part 数据
+
+                        found = std::search(
+                            buffer_.begin() + part_start, buffer_.end(),
+                            boundary_end.begin(), boundary_end.end()
+                        );
+                        size_t part_end = found != buffer_.end() ? std::distance(buffer_.begin(), found) : std::string::npos;
+
+
+                        // 使用示例
+                        if (part_end == std::string::npos || part_end - boundary_end.size() < needed) {
+                            // 没有找到完整的 Part 数据，等待更多数据
+                            ok = false;
+                            break;
+                        }
+
+                        size_t part_size = part_end - part_start;
+                        Logger::ngx_log_stderr(0, "needed : %d", needed);
+                        Logger::ngx_log_stderr(0, "part_start : %d", part_start);
+                        Logger::ngx_log_stderr(0, "part_end : %d", part_end);
+                        Logger::ngx_log_stderr(0, "buffer size : %d", buffer_.size());
+                        std::string part_data(reinterpret_cast<const char*>(buffer_.data()) + part_start, part_size);
+
+                        // 根据 Part 头部信息，处理数据
+                        if (part_header.find("Content-Disposition:") != std::string::npos) {
+                            // 检查是否为文件字段
+                            if (part_header.find("filename=") != std::string::npos) {
+                                // 保存文件内容
+                                request_.saveFilePart(part_data);  // 假设有此方法
+                            } else {
+                                // 保存普通表单字段
+                                request_.saveFormField(part_header, part_data);  // 假设有此方法
+                            }
+                        }
+
+                        // 移动解析位置到 Part 末尾
+                        parsed_pos_ = part_end;
+                        break;
+                        ok = true;
+                        state_ = kGotAll;
+                    }
                 }
                 break;
             }
             
             case kGotAll:
+                // // 处理完成后滑动窗口
+                // if (parsed_pos_ > 4096) {
+                //     buffer_.erase(0, parsed_pos_);
+                //     parsed_pos_ = 0;
+                // } else if (parsed_pos_ > 0) {
+                //     buffer_.erase(0, parsed_pos_);
+                //     parsed_pos_ = 0;
+                // }
                 return true;
         }
         
@@ -121,19 +307,9 @@ bool HttpContext::parseRequest(std::string buf, bool& isErr, std::chrono::system
 
     // 如果解析失败，重置状态
     if (isErr && !ok) {
-        state_ = kExpectRequestLine; // 重置状态到初始状态
-        buffer_.clear();             // 清空缓冲区
-        parsed_pos_ = 0;             // 重置解析位置
+        reset();
     }
 
-    // 滑动窗口优化（内存安全防御）
-    if (parsed_pos_ > 4096) {
-        buffer_ = buffer_.substr(parsed_pos_);
-        parsed_pos_ = 0;
-    } else if (parsed_pos_ > 0) {
-        buffer_.erase(0, parsed_pos_);
-        parsed_pos_ = 0;
-    }
     return ok;
 }
 

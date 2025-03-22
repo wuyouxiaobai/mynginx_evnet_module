@@ -138,11 +138,11 @@ void CThreadPool::StopAll() // 使线程池中的所有线程停止并退出
 
 }
 
-void CThreadPool::inMsgRecvQueueAndSignal(STRUC_MSG_HEADER msghead, std::string buf)// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
+void CThreadPool::inMsgRecvQueueAndSignal(STRUC_MSG_HEADER msghead, std::vector<uint8_t> buf)// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
 {
     {
         std::lock_guard<std::mutex> lock(m_pthreadMutex);
-        m_MsgRecvQueue.emplace_back(std::pair<STRUC_MSG_HEADER, std::string>(msghead, buf)); 
+        m_MsgRecvQueue.emplace_back(std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>(msghead, buf)); 
         ++m_iRecvMsgQueueCount; // 原子操作，无需锁
     }
     Call();

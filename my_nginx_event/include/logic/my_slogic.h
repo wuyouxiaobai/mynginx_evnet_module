@@ -22,7 +22,7 @@ public:
 
 public:
     // 解析http请求的函数
-    virtual void threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::string pMsgBuf);
+    virtual void threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint8_t> pMsgBuf);
 
 
 

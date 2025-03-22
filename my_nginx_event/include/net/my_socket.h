@@ -222,7 +222,7 @@ public:
 
     void printTDInfo(); // 打印统计信息
 public:
-    virtual void threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::string pMsgBuf){}; // 处理http请求
+    virtual void threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint8_t> pMsgBuf){}; // 处理http请求
     virtual void procPingTimeOutChecking(LPSTRUC_MSG_HEADER tmpmsg, time_t currTime); // 心跳包检测时间到，去检测心跳包是否超时，本函数只释放内存，子函数应该重写具体操作
 
 public:
@@ -326,7 +326,7 @@ private:
     struct epoll_event m_events[NGX_MAX_EVENTS]; // epoll_wait中接受返回的所发生的事件
 
     // 消息队列
-    std::list<std::pair<STRUC_MSG_HEADER, std::string>> m_MsgSendQueue; // 发送数据消息队列
+    std::list<std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>> m_MsgSendQueue; // 发送数据消息队列
     std::atomic<int> m_iSendMsgQueueCount; // 发送消息队列大小
 
     // 多线程相关

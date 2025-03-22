@@ -395,7 +395,7 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 
 
     // 加入发送队列
-    m_MsgSendQueue.emplace_back(msgHeader, psendbuf);
+    m_MsgSendQueue.emplace_back(msgHeader, std::vector<uint8_t>(psendbuf.begin(), psendbuf.end()));
     ++m_iSendMsgQueueCount;
 
     // 发送信号量通知发送线程
@@ -777,7 +777,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
             auto it = pSocket->m_MsgSendQueue.begin();
             
             while (it != pSocket->m_MsgSendQueue.end()) {
-                std::string& buf = it->second;
+                std::vector<uint8_t>& buf = it->second;
                 STRUC_MSG_HEADER pMsghead = it->first;
                 // 消息头验证
                 if ( pMsghead.pConn->iCurrsequence != pMsghead.iCurrsequence) 
@@ -796,7 +796,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
 
                 // 发送处理
                 Buffer tmpbuf;
-                tmpbuf.append(buf.c_str(), buf.size());
+                tmpbuf.append(reinterpret_cast<char*>(buf.data()), buf.size());
                 // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
                 ssize_t sendsize = pSocket->sendproc(pMsghead.pConn, tmpbuf);
                 // Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ServerSendQueueThread tmpbuf is: %s", tmpbuf.peek());
@@ -805,7 +805,8 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                     if (sendsize == tmpbuf.readableBytes()) {
                         tmpbuf.retrieveAll();
                         // 仅在完整发送时检查400响应
-                        if (buf == "HTTP/1.1 400 Bad Request\r\n\r\n") {
+                        if ((buf.size() == strlen("HTTP/1.1 400 Bad Request\r\n\r\n")) && 
+                            (memcmp(buf.data(), "HTTP/1.1 400 Bad Request\r\n\r\n", buf.size()) == 0)) {
                             Logger::ngx_log_stderr(0, "发送400错误后关闭连接 fd=%d", pMsghead.pConn->fd);
                             pSocket->zdClosesocketProc(pMsghead.pConn);
                         }

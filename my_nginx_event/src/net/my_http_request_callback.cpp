@@ -37,7 +37,7 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
     Logger::ngx_log_stderr(0, "test!!!!!!!!!!!!!!!!!!!!");
     // 创建消息缓冲区（头部+最大数据空间）
 
-    std::vector<char> buffer(4* 1024 * 1024);
+    std::vector<uint8_t> buffer(4* 1024 * 1024);
     Logger::ngx_log_stderr(0, "test2!!!!!!!!!!!!!!!!!!!!");
 
     // 接收网络数据
@@ -55,7 +55,7 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
         STRUC_MSG_HEADER msghead;
         msghead.iCurrsequence = pConn->iCurrsequence;
         msghead.pConn = pConn;
-        Server::instance().g_threadpool->inMsgRecvQueueAndSignal(msghead, buffer.data());
+        Server::instance().g_threadpool->inMsgRecvQueueAndSignal(msghead, buffer);
         return;
     }
 

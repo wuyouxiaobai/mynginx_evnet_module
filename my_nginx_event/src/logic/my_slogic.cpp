@@ -63,7 +63,7 @@ void CLogicSocket::registCallback(HttpRequest::Method method, const std::string 
 
 
 //处理接收消息队列中的消息，由线程池调用
-void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::string pMsgBuf)
+void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint8_t> pMsgBuf)
 {
     Logger::ngx_log_stderr(0, "threadRecvProcFunc ing。。。。。。。。");
 
@@ -319,27 +319,41 @@ bool CLogicSocket::InitRouterRegist()
                 resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
                 resp->setContentType("text/html; charset=utf-8");
                 // 解析表单数据
-                std::string body = req.getBody();
+                std::vector<uint8_t> body = req.getBody();
                 std::string prefix = "testData=";
-                size_t pos = body.find(prefix);
+                // 将字符串转换为字节序列
+                std::vector<uint8_t> prefix_bytes(prefix.begin(), prefix.end());
+
+                // 使用 std::search 算法查找字节序列
+                auto it = std::search(
+                    body.begin(), 
+                    body.end(),
+                    prefix_bytes.begin(),
+                    prefix_bytes.end()
+                );
+
+                // 判断是否找到并计算位置
+                size_t pos = (it != body.end()) ? std::distance(body.begin(), it) : std::string::npos;
                 
                 if (pos == std::string::npos) {
                     throw std::runtime_error("Invalid form data");
                 }
     
                 // URL解码并获取值
-                std::string encoded = body.substr(pos + prefix.length());
+                auto start = body.begin() + pos + prefix.size();
+                std::vector<uint8_t> encoded(start, body.end());
+                std::string encoded_str(encoded.begin(), encoded.end());
                 std::string decoded;
                 for (size_t i = 0; i < encoded.size(); ++i) {
-                    if (encoded[i] == '%' && i+2 < encoded.size()) {
+                    if (encoded_str[i] == '%' && i+2 < encoded_str.size()) {
                         int hex;
-                        sscanf(encoded.substr(i+1,2).c_str(), "%x", &hex);
+                        sscanf(encoded_str.substr(i+1,2).c_str(), "%x", &hex);
                         decoded += static_cast<char>(hex);
                         i += 2;
-                    } else if (encoded[i] == '+') {
+                    } else if (encoded_str[i] == '+') {
                         decoded += ' ';
                     } else {
-                        decoded += encoded[i];
+                        decoded += encoded_str[i];
                     }
                 }
     
@@ -390,74 +404,75 @@ bool CLogicSocket::InitRouterRegist()
         }
     );
 
-    m_Router->registerCallback(
-        HttpRequest::Method::kPost,
-        "/uploadvideo",
-        [](const HttpRequest& req, HttpResponse* resp) {
-            // 1. 确保上传目录存在
-            const std::string uploadDir = "../video/";
-            if (!std::filesystem::exists(uploadDir)) {
-                std::filesystem::create_directories(uploadDir);
-            }
+    // m_Router->registerCallback(
+    //     HttpRequest::Method::kPost,
+    //     "/uploadvideo",
+    //     [](const HttpRequest& req, HttpResponse* resp) 
+        // {
+        //     // 1. 确保上传目录存在
+        //     const std::string uploadDir = "../video/";
+        //     if (!std::filesystem::exists(uploadDir)) {
+        //         std::filesystem::create_directories(uploadDir);
+        //     }
     
-            // 2. 解析Content-Type获取boundary
-            std::string contentType = req.getHeader("Content-Type");
-            size_t boundaryPos = contentType.find("boundary=");
-            if (boundaryPos == std::string::npos) {
-                resp->setStatusCode(HttpResponse::k400BadRequest);
-                resp->setBody("Invalid Content-Type");
-                return;
-            }
-            std::string boundary = "--" + contentType.substr(boundaryPos + 9);
+        //     // 2. 解析Content-Type获取boundary
+        //     std::string contentType = req.getHeader("Content-Type");
+        //     size_t boundaryPos = contentType.find("boundary=");
+        //     if (boundaryPos == std::string::npos) {
+        //         resp->setStatusCode(HttpResponse::k400BadRequest);
+        //         resp->setBody("Invalid Content-Type");
+        //         return;
+        //     }
+        //     std::string boundary = "--" + contentType.substr(boundaryPos + 9);
     
-            // 3. 获取原始请求体
-            const std::string& body = req.getBody();
+        //     // 3. 获取原始请求体
+        //     std::vector<uint8_t> body = req.getBody();
     
-            // 4. 解析multipart数据
-            size_t fileStart = body.find(boundary);
-            while (fileStart != std::string::npos) {
-                size_t headersEnd = body.find("\r\n\r\n", fileStart);
-                if (headersEnd == std::string::npos) break;
+        //     // 4. 解析multipart数据
+        //     size_t fileStart = body.find(boundary);
+        //     while (fileStart != std::string::npos) {
+        //         size_t headersEnd = body.find("\r\n\r\n", fileStart);
+        //         if (headersEnd == std::string::npos) break;
     
-                // 解析文件头信息
-                std::string headers = body.substr(
-                    fileStart + boundary.length() + 2, // 跳过boundary和换行
-                    headersEnd - (fileStart + boundary.length() + 2)
-                );
+        //         // 解析文件头信息
+        //         std::string headers = body.substr(
+        //             fileStart + boundary.length() + 2, // 跳过boundary和换行
+        //             headersEnd - (fileStart + boundary.length() + 2)
+        //         );
     
-                // 查找文件名
-                size_t namePos = headers.find("filename=\"");
-                if (namePos != std::string::npos) {
-                    size_t endQuote = headers.find("\"", namePos + 10);
-                    std::string filename = headers.substr(
-                        namePos + 10,
-                        endQuote - (namePos + 10)
-                    );
+        //         // 查找文件名
+        //         size_t namePos = headers.find("filename=\"");
+        //         if (namePos != std::string::npos) {
+        //             size_t endQuote = headers.find("\"", namePos + 10);
+        //             std::string filename = headers.substr(
+        //                 namePos + 10,
+        //                 endQuote - (namePos + 10)
+        //             );
     
-                    // 提取文件内容
-                    size_t dataStart = headersEnd + 4;
-                    size_t dataEnd = body.find(boundary, dataStart);
-                    std::string fileContent = body.substr(
-                        dataStart,
-                        dataEnd - dataStart - 4 // 减去结尾的\r\n
-                    );
+        //             // 提取文件内容
+        //             size_t dataStart = headersEnd + 4;
+        //             size_t dataEnd = body.find(boundary, dataStart);
+        //             std::string fileContent = body.substr(
+        //                 dataStart,
+        //                 dataEnd - dataStart - 4 // 减去结尾的\r\n
+        //             );
     
-                    // 保存文件
-                    std::ofstream out(uploadDir + filename, std::ios::binary);
-                    out.write(fileContent.data(), fileContent.size());
-                    resp->setStatusCode(HttpResponse::k200Ok);
-                    resp->setBody("Upload success");
-                    return;
-                }
+        //             // 保存文件
+        //             std::ofstream out(uploadDir + filename, std::ios::binary);
+        //             out.write(fileContent.data(), fileContent.size());
+        //             resp->setStatusCode(HttpResponse::k200Ok);
+        //             resp->setBody("Upload success");
+        //             return;
+        //         }
     
-                fileStart = body.find(boundary, headersEnd);
-            }
+        //         fileStart = body.find(boundary, headersEnd);
+        //     }
     
-            // 未找到有效文件
-            resp->setStatusCode(HttpResponse::k400BadRequest);
-            resp->setBody("No video file received");
-        }
-    );
+        //     // 未找到有效文件
+        //     resp->setStatusCode(HttpResponse::k400BadRequest);
+        //     resp->setBody("No video file received");
+        // }
+    // );
     
     m_Router->registerCallback(
         HttpRequest::Method::kGet,
