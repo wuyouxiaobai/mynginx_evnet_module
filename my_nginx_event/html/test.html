@@ -74,61 +74,77 @@
     </div>
 
     <script>
-        // 初始化加载视频列表
-        function loadVideoList() {
-            fetch('/getvideos')
-                .then(res => res.json())
-                .then(videos => {
-                    const selector = document.getElementById('videoSelector');
-                    selector.innerHTML = '<option value="">选择视频文件</option>';
-                    videos.forEach(video => {
-                        const option = document.createElement('option');
-                        option.value = video;
-                        option.textContent = video;
-                        selector.appendChild(option);
-                    });
-                });
+        // 初始化加载视频列表（网页6的动态加载方式）
+function loadVideoList() {
+    fetch('/getvideos')
+        .then(res => res.json())
+        .then(videos => {
+            updateSelector(videos);
+        });
+}
+
+// 上传功能改造（网页2的分片上传建议）
+function uploadVideo() {
+    const input = document.getElementById('videoUpload');
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('video', file);
+
+    // 显示进度条（网页1的进度显示建议）
+    const progressBar = document.getElementById('uploadProgress');
+    let uploadProgress = 0;
+    const interval = setInterval(() => {
+        uploadProgress = Math.min(uploadProgress + 10, 90);
+        progressBar.value = uploadProgress;
+    }, 500);
+
+    fetch('/uploadvideo', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        clearInterval(interval);
+        progressBar.value = 100;
+        if (!response.ok) throw new Error('上传失败');
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            updateSelector(data.files); // 直接使用返回的最新列表（网页7的优化逻辑）
         }
+        setTimeout(() => progressBar.value = 0, 2000);
+    })
+    .catch(error => {
+        console.error('上传错误:', error);
+        alert(error.message || '视频上传失败');
+    });
+}
 
-        // 视频上传功能
-        function uploadVideo() {
-            const input = document.getElementById('videoUpload');
-            const file = input.files[0];
-            if (!file) return;
+// 动态更新选择器（网页8的列表渲染方式）
+function updateSelector(filenames) {
+    const selector = document.getElementById('videoSelector');
+    selector.innerHTML = '<option value="">选择视频文件</option>';
+    filenames.forEach(filename => {
+        const option = document.createElement('option');
+        option.value = filename;
+        option.textContent = filename;
+        selector.appendChild(option);
+    });
+}
+function changeVideo(filename) {
+    if (!filename) return;  // 防止选择为空时执行
+    const videoSource = document.getElementById('videoSource');
+    videoSource.src = `/video/${filename}`;  // 设置视频路径
+    const player = document.getElementById('mainPlayer');
+    player.load();  // 重新加载视频源
+}
 
-            const formData = new FormData();
-            formData.append('video', file);
-
-            fetch('/uploadvideo', {
-                method: 'POST',
-                body: formData,
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('上传失败');
-                return response.text();
-            })
-            .then(() => {
-                loadVideoList();
-                document.getElementById('uploadProgress').value = 0;
-            })
-            .catch(error => {
-                console.error('上传错误:', error);
-                alert('视频上传失败');
-            });
-        }
-
-        // 切换播放视频
-        function changeVideo(filename) {
-            if (!filename) return;
-            const player = document.getElementById('mainPlayer');
-            player.pause();
-            document.getElementById('videoSource').src = `/getvideo/${encodeURIComponent(filename)}`;
-            player.load();
-            player.play().catch(() => {}); // 自动播放被阻止时静默失败
-        }
-
-        // 初始化加载列表
-        loadVideoList();
+// 在页面加载完成时初始化视频列表
+window.onload = function () {
+    loadVideoList();
+};
     </script>
 </body>
 </html>

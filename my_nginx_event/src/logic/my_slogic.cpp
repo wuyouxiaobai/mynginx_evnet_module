@@ -9,6 +9,7 @@
 #include <fstream> 
 #include "my_macro.h" 
 #include <nlohmann/json.hpp>
+
 namespace WYXB
 {
 // //定义成员函数指针
@@ -276,6 +277,67 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
 
 /// 路由相关
 // 初始化时注册
+// 文件重命名
+std::string urlDecode(const std::string &src) {
+    std::string ret;
+    size_t length = src.length();
+    for (size_t i = 0; i < length; ++i) {
+        char ch = src[i];
+        if (ch == '%') {
+            // 确保后面有两个字符可以解析
+            if (i + 2 >= length) {
+                throw std::runtime_error("Invalid URL encoding.");
+            }
+            std::string hexStr = src.substr(i + 1, 2);
+            int hexValue;
+            std::istringstream iss(hexStr);
+            iss >> std::hex >> hexValue;
+            ret += static_cast<char>(hexValue);
+            i += 2; // 跳过两个已经解析的字符
+        } else if (ch == '+') {
+            ret += ' ';
+        } else {
+            ret += ch;
+        }
+    }
+    return ret;
+}
+
+std::string sanitizeFilename(const std::string& rawFilename) {
+    // 1. URL 解码
+    std::string decoded = urlDecode(rawFilename);
+
+    // 2. 去除非法字符（例如只允许字母、数字、下划线和点）
+    std::string safe;
+    for (char c : decoded) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.')
+            safe.push_back(c);
+        else
+            safe.push_back('_');
+    }
+
+    // 3. 分离文件扩展名（最后一个点后的部分）
+    std::string baseName = safe;
+    std::string extension;
+    size_t pos = safe.rfind('.');
+    if (pos != std::string::npos) {
+        baseName = safe.substr(0, pos);    // 主文件名
+        extension = safe.substr(pos);      // 包含点的扩展名
+    }
+
+    // 4. 限制主文件名长度（不包括扩展名）
+    const size_t MAX_BASENAME_LENGTH = 10; // 例如：最大10个字符
+    if (baseName.length() > MAX_BASENAME_LENGTH) {
+        baseName = baseName.substr(0, MAX_BASENAME_LENGTH);
+    }
+
+    // 5. 重新拼接文件名
+    return baseName + extension;
+}
+
+
+
+
 bool CLogicSocket::InitRouterRegist()
 {
 // 示例：注册动态路径心跳
@@ -424,7 +486,6 @@ bool CLogicSocket::InitRouterRegist()
         {
             // 1. 确保上传目录存在
             resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
-            resp->setContentType("text/html; charset=utf-8");
             
             Logger::ngx_log_stderr(0 ,"uploadvideo test");
             const std::string uploadDir = "../video/";
@@ -455,10 +516,27 @@ bool CLogicSocket::InitRouterRegist()
 
 
                 // 保存文件
+                filename = sanitizeFilename(filename);
                 std::ofstream out(uploadDir + filename, std::ios::binary);
                 out.write(reinterpret_cast<const char*>(body.data()), body.size() * sizeof(body[0]));
                 resp->setStatusCode(HttpResponse::k200Ok);
-                resp->setBody("Upload success");
+
+                nlohmann::json root;
+                root["status"] = "success";
+                root["message"] = "Upload success";
+                
+                // 遍历目录获取文件列表
+                std::vector<std::string> newList;
+                for (const auto& entry : std::filesystem::directory_iterator(uploadDir)) {
+                    newList.push_back(entry.path().filename().string());
+                }
+                
+                // 直接将 vector 赋值给 JSON 数组（自动转换）
+                root["files"] = newList;  // 或使用 root["files"] = nlohmann::json::array(newList);
+                
+                // 设置响应内容（自动序列化）
+                resp->setContentType("application/json");
+                resp->setBody(root.dump());  // 默认无缩进，等同于 Json::FastWriter
                 return;
             }
 
@@ -474,56 +552,96 @@ bool CLogicSocket::InitRouterRegist()
         HttpRequest::Method::kGet,
         "/getvideos",
         [](const HttpRequest& req, HttpResponse* resp) {
-            // 使用命名常量提升可维护性
-            constexpr const char* videoDir = "../video/";
-            constexpr const char* targetExt = ".mp4";
+            const std::string videoDir = "../video/";
+            nlohmann::json fileList = nlohmann::json::array();
             
-            std::vector<std::string> videos;
-    
-            try {
-                // 前置目录检查避免异常
-                if (!std::filesystem::exists(videoDir)) {
-                    throw std::runtime_error("Directory not found");
-                }
-    
-                // 优化文件遍历逻辑
-                for (const auto& entry : std::filesystem::directory_iterator(videoDir)) {
-                    if (entry.is_regular_file()) {
-                        // 不区分大小写的扩展名比较
-                        std::string ext = entry.path().extension().string();
-                        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                        
-                        if (ext == targetExt) {
-                            videos.emplace_back(entry.path().filename().string());
-                        }
-                    }
-                }
-    
-                // 使用nlohmann/json直接序列化
-                resp->setContentType("application/json; charset=utf-8");
-                resp->setBody(nlohmann::json(videos).dump());
-                
-                // 添加缓存控制头
-                resp->addHeader("Cache-Control", "max-age=3600");
-    
-            } catch (const std::exception& e) {
-                // 细化错误处理
-                Logger::ngx_log_stderr(0, "Video list error: %s | Path: %s", 
-                                     e.what(), videoDir);
-                
-                resp->setStatusCode(HttpResponse::k503ServiceUnavailable);
-                resp->setContentType("application/problem+json");
-                
-                nlohmann::json error = {
-                    {"type", "/errors/video-list"},
-                    {"title", "Video Listing Failed"},
-                    {"status", 503},
-                    {"detail", "Failed to retrieve video list"}
-                };
-                resp->setBody(error.dump());
+            for (const auto& entry : std::filesystem::directory_iterator(videoDir)) {
+                fileList.push_back(entry.path().filename().string());
             }
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("application/json");
+            resp->addHeader("Access-Control-Allow-Origin", "*");
+            resp->setBody(fileList.dump());
         }
     );
+
+
+    m_Router->addRegexCallback(
+        HttpRequest::Method::kGet,
+        "/video/:filename",
+        [](const HttpRequest& req, HttpResponse* resp) {
+            std::string path = req.path().substr(7);  // 获取 '/video/' 后的文件名部分
+            std::string videoPath = "../video/" + path;
+        
+            if (!std::filesystem::exists(videoPath)) {
+                Logger::ngx_log_stderr(0, "Video not found");
+                resp->setStatusCode(HttpResponse::k404NotFound);
+                resp->setBody("Video not found");
+                return;
+            }
+        
+            // 获取视频文件大小
+            std::uintmax_t fileSize = std::filesystem::file_size(videoPath);
+        
+            // 打开文件流，并以二进制模式读取
+            std::ifstream videoFile(videoPath, std::ios::binary);
+            if (!videoFile) {
+                resp->setStatusCode(HttpResponse::k500InternalServerError);
+                resp->setBody("Failed to open video file");
+                return;
+            }
+        
+            // 检查是否存在 Range 请求头
+            std::string rangeHeader = req.getHeader("Range"); 
+            if (!rangeHeader.empty()) {
+                size_t pos = rangeHeader.find('=');
+                if (pos != std::string::npos) {
+                    std::string rangeSpec = rangeHeader.substr(pos + 1);
+                    size_t dashPos = rangeSpec.find('-');
+                    if (dashPos != std::string::npos) {
+                        // 解析起始字节
+                        long long start = std::stoll(rangeSpec.substr(0, dashPos));
+                        long long end = fileSize - 1;  // 默认到文件末尾
+                        // 如果提供了结束字节，则解析结束字节
+                        if (dashPos + 1 < rangeSpec.size() && !rangeSpec.substr(dashPos + 1).empty()) {
+                            end = std::stoll(rangeSpec.substr(dashPos + 1));
+                        }
+                        // 确保范围合法
+                        if (start > end || end >= fileSize) {
+                            resp->setStatusCode(HttpResponse::k416RangeNotSatisfiable);
+                            resp->setBody("Requested Range Not Satisfiable");
+                            return;
+                        }
+        
+                        std::size_t contentLength = static_cast<std::size_t>(end - start + 1);
+        
+                        // 定位到起始位置，并读取指定范围的数据
+                        videoFile.seekg(start);
+                        std::vector<char> buffer(contentLength);
+                        videoFile.read(buffer.data(), contentLength);
+        
+                        // 设置部分内容响应头
+                        resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k206PartialContent, "Partial Content");
+                        resp->addHeader("Content-Range", "bytes " + std::to_string(start) + "-" + std::to_string(end) + "/" + std::to_string(fileSize));
+                        resp->addHeader("Accept-Ranges", "bytes");
+                        resp->addHeader("Content-Length", std::to_string(contentLength));
+                        resp->setContentType("video/mp4");  // 根据实际视频格式设置
+                        resp->setBody(std::string(buffer.begin(), buffer.end()));
+                        return;
+                    }
+                }
+            }
+        
+            // 如果没有 Range 请求，返回整个文件
+            std::ostringstream ss;
+            ss << videoFile.rdbuf();
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("video/mp4");
+            resp->setBody(ss.str());
+        }
+    );
+    
+    
     
     // m_Router->registerCallback(
     //     HttpRequest::Method::kGet,
@@ -553,6 +671,18 @@ bool CLogicSocket::InitRouterRegist()
 
     return true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
