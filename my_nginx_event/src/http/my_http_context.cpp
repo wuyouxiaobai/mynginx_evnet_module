@@ -272,7 +272,8 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                             // 检查是否为文件字段
                             if (part_header.find("filename=") != std::string::npos) {
                                 // 保存文件内容
-                                request_.saveFilePart(part_data);  // 假设有此方法
+                                request_.appendBody(part_data.data(), part_data.size());  // 假设有此方法
+                                request_.savefileHeader(part_header);
                             } else {
                                 // 保存普通表单字段
                                 request_.saveFormField(part_header, part_data);  // 假设有此方法

@@ -70,6 +70,7 @@ public:
     }
 
     void appendBody(const char* data, size_t len) {
+        content_.reserve(len);
         const uint8_t* u8_data = reinterpret_cast<const uint8_t*>(data);
         content_.insert(content_.end(), u8_data, u8_data + len);
     }
@@ -93,6 +94,16 @@ public:
     std::string boundary()
     {
         return boundary_;
+    }
+
+    void savefileHeader(std::string fileHeader)
+    {
+        fileHeader_ = fileHeader;
+    }
+
+    std::string getfileHeader() const
+    {
+        return fileHeader_;
     }
 
     // 保存上传的文件部分
@@ -146,6 +157,7 @@ private:
     std::vector<uint8_t>                         content_; // 请求体
     uint64_t                                     contentLength_ { 0 }; // 请求体长度
     std::string                                  boundary_ ;  // 视频边界
+    std::string                                  fileHeader_;   // 视频文件名称
 
     // 用于保存表单字段（非文件上传）数据
     std::unordered_map<std::string, std::string> formFields_;

@@ -85,14 +85,15 @@ void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint
         {
             std::unique_lock<std::mutex> lock(headptr->mtx_context_);
             // 循环等待条件满足，避免虚假唤醒
-            headptr->cv_context_.wait(lock, [&]() { 
+            headptr->cv_context_.wait_for(lock, std::chrono::milliseconds(500) , [&]() { 
                 return headptr->context_->sequence == msghead.sequence; 
             });
 
-            ok = headptr->context_->parseRequest(pMsgBuf, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
-            headptr->context_->sequence++;
-            headptr->cv_context_.notify_one(); // 或 notify_all()
+
         }
+        ok = headptr->context_->parseRequest(pMsgBuf, isErr, std::chrono::system_clock::now()); // 判断是否解析完成
+        headptr->context_->sequence++;
+        headptr->cv_context_.notify_all(); // 或 notify_all()
         
 
         Logger::ngx_log_stderr(0, "解析前2。。。。。。。。。");
@@ -416,75 +417,58 @@ bool CLogicSocket::InitRouterRegist()
         }
     );
 
-    // m_Router->registerCallback(
-    //     HttpRequest::Method::kPost,
-    //     "/uploadvideo",
-    //     [](const HttpRequest& req, HttpResponse* resp) 
-        // {
-        //     // 1. 确保上传目录存在
-        //     const std::string uploadDir = "../video/";
-        //     if (!std::filesystem::exists(uploadDir)) {
-        //         std::filesystem::create_directories(uploadDir);
-        //     }
+    m_Router->registerCallback(
+        HttpRequest::Method::kPost,
+        "/uploadvideo",
+        [](const HttpRequest& req, HttpResponse* resp) 
+        {
+            // 1. 确保上传目录存在
+            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("text/html; charset=utf-8");
+            
+            Logger::ngx_log_stderr(0 ,"uploadvideo test");
+            const std::string uploadDir = "../video/";
+            if (!std::filesystem::exists(uploadDir)) {
+                std::filesystem::create_directories(uploadDir);
+            }
     
-        //     // 2. 解析Content-Type获取boundary
-        //     std::string contentType = req.getHeader("Content-Type");
-        //     size_t boundaryPos = contentType.find("boundary=");
-        //     if (boundaryPos == std::string::npos) {
-        //         resp->setStatusCode(HttpResponse::k400BadRequest);
-        //         resp->setBody("Invalid Content-Type");
-        //         return;
-        //     }
-        //     std::string boundary = "--" + contentType.substr(boundaryPos + 9);
+            // 2. 解析Content-Type获取boundary
+            std::string fileHeader = req.getfileHeader();
+            if (fileHeader.empty()) {
+                resp->setStatusCode(HttpResponse::k400BadRequest);
+                resp->setBody("Invalid Content-Type");
+                return;
+            }
     
-        //     // 3. 获取原始请求体
-        //     std::vector<uint8_t> body = req.getBody();
+            // 3. 获取原始请求体
+            std::vector<uint8_t> body = req.getBody();
+
     
-        //     // 4. 解析multipart数据
-        //     size_t fileStart = body.find(boundary);
-        //     while (fileStart != std::string::npos) {
-        //         size_t headersEnd = body.find("\r\n\r\n", fileStart);
-        //         if (headersEnd == std::string::npos) break;
+            // 查找文件名
+            size_t namePos = fileHeader.find("filename=\"");
+            if (namePos != std::string::npos) {
+                size_t endQuote = fileHeader.find("\"", namePos + 10);
+                std::string filename = fileHeader.substr(
+                    namePos + 10,
+                    endQuote - (namePos + 10)
+                );
+
+
+                // 保存文件
+                std::ofstream out(uploadDir + filename, std::ios::binary);
+                out.write(reinterpret_cast<const char*>(body.data()), body.size() * sizeof(body[0]));
+                resp->setStatusCode(HttpResponse::k200Ok);
+                resp->setBody("Upload success");
+                return;
+            }
+
+
     
-        //         // 解析文件头信息
-        //         std::string headers = body.substr(
-        //             fileStart + boundary.length() + 2, // 跳过boundary和换行
-        //             headersEnd - (fileStart + boundary.length() + 2)
-        //         );
-    
-        //         // 查找文件名
-        //         size_t namePos = headers.find("filename=\"");
-        //         if (namePos != std::string::npos) {
-        //             size_t endQuote = headers.find("\"", namePos + 10);
-        //             std::string filename = headers.substr(
-        //                 namePos + 10,
-        //                 endQuote - (namePos + 10)
-        //             );
-    
-        //             // 提取文件内容
-        //             size_t dataStart = headersEnd + 4;
-        //             size_t dataEnd = body.find(boundary, dataStart);
-        //             std::string fileContent = body.substr(
-        //                 dataStart,
-        //                 dataEnd - dataStart - 4 // 减去结尾的\r\n
-        //             );
-    
-        //             // 保存文件
-        //             std::ofstream out(uploadDir + filename, std::ios::binary);
-        //             out.write(fileContent.data(), fileContent.size());
-        //             resp->setStatusCode(HttpResponse::k200Ok);
-        //             resp->setBody("Upload success");
-        //             return;
-        //         }
-    
-        //         fileStart = body.find(boundary, headersEnd);
-        //     }
-    
-        //     // 未找到有效文件
-        //     resp->setStatusCode(HttpResponse::k400BadRequest);
-        //     resp->setBody("No video file received");
-        // }
-    // );
+            // 未找到有效文件
+            resp->setStatusCode(HttpResponse::k400BadRequest);
+            resp->setBody("No video file received");
+        }
+    );
     
     m_Router->registerCallback(
         HttpRequest::Method::kGet,
