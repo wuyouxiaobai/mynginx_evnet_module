@@ -237,14 +237,21 @@ bool CSocket::Initialize_subproc()
         return false;
     }
 
-// 创建发送线程线程
+// 创建发送线程池
+MyConf* config = MyConf::getInstance(); //初始化配置文件
+int tmpSendThread = config->GetIntDefault("ProcMsgSendWorkThreadCount", 5);
+for(int i = 0; i < tmpSendThread; i++)
+{
     auto pSendThread = std::make_shared<ThreadItem>(); //专门用来发送数据的线程
     pSendThread->tie(shared_from_this());
     // 使用 lambda 捕获 shared_ptr，确保线程内对象存活
     pSendThread->_Thread = std::thread([pSendThread]() {
         ServerSendQueueThread(pSendThread.get());  // 传递原始指针或智能指针
     });
-    m_threadVector.push_back(std::move(pSendThread)); //创建新线程并存入
+    m_threadVector.push_back(std::move(pSendThread)); //创建新线程并存入线程池
+}
+
+
     // ThreadItem* pRecyconn; //专门用来回收连接的线程
     // m_threadVector.push_back(pRecyconn = new ThreadItem(this)); //创建新线程并存入
     // err = pthread_create(&pRecyconn->_Handle, NULL, ServerRecyConnectionThread, pRecyconn);
