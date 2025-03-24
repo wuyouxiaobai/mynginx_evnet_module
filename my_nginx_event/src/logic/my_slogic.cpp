@@ -570,29 +570,31 @@ bool CLogicSocket::InitRouterRegist()
         HttpRequest::Method::kGet,
         "/video/:filename",
         [](const HttpRequest& req, HttpResponse* resp) {
-            std::string path = req.path().substr(7);  // 获取 '/video/' 后的文件名部分
+            // 获取 '/video/' 后面的文件名
+            std::string path = req.path().substr(7);
             std::string videoPath = "../video/" + path;
-        
+            
+            // 文件不存在处理
             if (!std::filesystem::exists(videoPath)) {
                 Logger::ngx_log_stderr(0, "Video not found");
                 resp->setStatusCode(HttpResponse::k404NotFound);
                 resp->setBody("Video not found");
                 return;
             }
-        
-            // 获取视频文件大小
+            
+            // 获取文件总大小
             std::uintmax_t fileSize = std::filesystem::file_size(videoPath);
-        
-            // 打开文件流，并以二进制模式读取
+            
+            // 打开文件流
             std::ifstream videoFile(videoPath, std::ios::binary);
             if (!videoFile) {
                 resp->setStatusCode(HttpResponse::k500InternalServerError);
                 resp->setBody("Failed to open video file");
                 return;
             }
-        
+            
             // 检查是否存在 Range 请求头
-            std::string rangeHeader = req.getHeader("Range"); 
+            std::string rangeHeader = req.getHeader("Range");
             if (!rangeHeader.empty()) {
                 size_t pos = rangeHeader.find('=');
                 if (pos != std::string::npos) {
@@ -602,44 +604,75 @@ bool CLogicSocket::InitRouterRegist()
                         // 解析起始字节
                         long long start = std::stoll(rangeSpec.substr(0, dashPos));
                         long long end = fileSize - 1;  // 默认到文件末尾
-                        // 如果提供了结束字节，则解析结束字节
                         if (dashPos + 1 < rangeSpec.size() && !rangeSpec.substr(dashPos + 1).empty()) {
                             end = std::stoll(rangeSpec.substr(dashPos + 1));
                         }
-                        // 确保范围合法
                         if (start > end || end >= fileSize) {
                             resp->setStatusCode(HttpResponse::k416RangeNotSatisfiable);
                             resp->setBody("Requested Range Not Satisfiable");
                             return;
                         }
-        
+                        
+                        // 计算需要传输的字节数
                         std::size_t contentLength = static_cast<std::size_t>(end - start + 1);
-        
-                        // 定位到起始位置，并读取指定范围的数据
                         videoFile.seekg(start);
-                        std::vector<char> buffer(contentLength);
-                        videoFile.read(buffer.data(), contentLength);
-        
-                        // 设置部分内容响应头
-                        resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k206PartialContent, "Partial Content");
+                        
+                        // 设置响应头：206状态，Content-Range 以及 chunked 编码（不指定 Content-Length）
+                        resp->setStatusLine(req.getVersion(), HttpResponse::k206PartialContent, "Partial Content");
                         resp->addHeader("Content-Range", "bytes " + std::to_string(start) + "-" + std::to_string(end) + "/" + std::to_string(fileSize));
                         resp->addHeader("Accept-Ranges", "bytes");
-                        resp->addHeader("Content-Length", std::to_string(contentLength));
-                        resp->setContentType("video/mp4");  // 根据实际视频格式设置
-                        resp->setBody(std::string(buffer.begin(), buffer.end()));
+                        resp->addHeader("Transfer-Encoding", "chunked");
+                        resp->setContentType("video/mp4");
+                        
+                        // 分块读取并构造 chunked 编码数据
+                        const size_t CHUNK_SIZE = 8192;
+                        std::string chunkedBody;
+                        size_t bytesRemaining = contentLength;
+                        // while (bytesRemaining > 0) {
+                            size_t toRead = std::min(CHUNK_SIZE, bytesRemaining);
+                            std::vector<char> buffer(toRead);
+                            videoFile.read(buffer.data(), toRead);
+                            std::streamsize bytesRead = videoFile.gcount();
+                            if (bytesRead <= 0) return;
+                            // 构造当前 chunk，格式为：<chunk size in hex>\r\n<data>\r\n
+                            std::ostringstream oss;
+                            oss << std::hex << bytesRead << "\r\n";
+                            chunkedBody.append(oss.str());
+                            chunkedBody.append(buffer.data(), bytesRead);
+                            chunkedBody.append("\r\n");
+                            bytesRemaining -= bytesRead;
+                        // }
+                        // 添加终止 chunk
+                        chunkedBody.append("0\r\n\r\n");
+                        resp->setBody(chunkedBody);
                         return;
                     }
                 }
             }
-        
-            // 如果没有 Range 请求，返回整个文件
-            std::ostringstream ss;
-            ss << videoFile.rdbuf();
-            resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
+            
+            // 如果没有 Range 请求，返回整个文件（使用 chunked 传输）
+            resp->setStatusLine(req.getVersion(), HttpResponse::k200Ok, "OK");
             resp->setContentType("video/mp4");
-            resp->setBody(ss.str());
+            resp->addHeader("Transfer-Encoding", "chunked");
+            const size_t CHUNK_SIZE = 8192;
+            std::string chunkedBody;
+            while (videoFile) {
+                std::vector<char> buffer(CHUNK_SIZE);
+                videoFile.read(buffer.data(), CHUNK_SIZE);
+                std::streamsize bytesRead = videoFile.gcount();
+                if (bytesRead <= 0)
+                    break;
+                std::ostringstream oss;
+                oss << std::hex << bytesRead << "\r\n";
+                chunkedBody.append(oss.str());
+                chunkedBody.append(buffer.data(), bytesRead);
+                chunkedBody.append("\r\n");
+            }
+            chunkedBody.append("0\r\n\r\n");
+            resp->setBody(chunkedBody);
         }
     );
+    
     
     
     
