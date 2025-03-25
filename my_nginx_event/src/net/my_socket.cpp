@@ -230,16 +230,16 @@ bool CSocket::Initialize_subproc()
     //     ngx_log_stderr(0,"CSocket::Initialize_subproc()中pthread_mutex_init(&m_timequeueMutex)失败.");
     //     return false;    
     // }
-
-    if(sem_init(&m_semEventSendQueue,0,0) == -1)
-    {
-        Logger::ngx_log_stderr(0,"CSocket::Initialize_subproc()中sem_init(&m_semEventSendQueue,0,0)失败.");
-        return false;
-    }
-
 // 创建发送线程池
 MyConf* config = MyConf::getInstance(); //初始化配置文件
 int tmpSendThread = config->GetIntDefault("ProcMsgSendWorkThreadCount", 5);
+    if(sem_init(&m_semEventSendQueue,0,0) == -1)
+    {
+        Logger::ngx_log_stderr(0,"CSocket::Initialize_subproc()中sem_init(&m_semEventSendQueue_empty,0,0)失败.");
+        return false;
+    }
+
+
 for(int i = 0; i < tmpSendThread; i++)
 {
     auto pSendThread = std::make_shared<ThreadItem>(); //专门用来发送数据的线程
@@ -313,9 +313,15 @@ for(int i = 0; i < tmpSendThread; i++)
 void CSocket::Shotdown_subproc()
 {
     // 1. 发送信号量通知线程退出
+MyConf* config = MyConf::getInstance(); //初始化配置文件
+int tmpSendThread = config->GetIntDefault("ProcMsgSendWorkThreadCount", 5);
+for(int i = 0; i < tmpSendThread; i++)
+{
     if (sem_post(&m_semEventSendQueue) == -1) {
-        Logger::ngx_log_stderr(0, "CSocket::Shutdown_subproc()中sem_post失败: errno=%d", errno);
+        Logger::ngx_log_stderr(0, "CSocket::Shutdown_subproc()中sem_post m_semEventSendQueue_empty 失败: errno=%d", errno);
     }
+}
+
 
     // 2. 安全等待所有线程退出（RAII 管理）
     for (auto& pItem : m_threadVector) {
