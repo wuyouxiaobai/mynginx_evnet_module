@@ -243,7 +243,7 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
             resp->setStatusCode(HttpResponse::k404NotFound);
             resp->setStatusMessage("Not Found");
             resp->setCloseConnection(true);
-            resp->setVersion(req.getVersion());
+            resp->setVersion(mutableReq.getVersion());
         }
 
         // 处理响应后的中间件
@@ -515,10 +515,13 @@ bool CLogicSocket::InitRouterRegist()
                 );
 
 
-                // 保存文件
-                filename = sanitizeFilename(filename);
-                std::ofstream out(uploadDir + filename, std::ios::binary);
-                out.write(reinterpret_cast<const char*>(body.data()), body.size() * sizeof(body[0]));
+                if(req.contentLength() <= LARGE_FILE_THRESHOLD)
+                {
+                    // 保存文件
+                    filename = sanitizeFilename(filename);
+                    std::ofstream out(uploadDir + filename, std::ios::binary);
+                    out.write(reinterpret_cast<const char*>(body.data()), body.size() * sizeof(body[0]));
+                }
                 resp->setStatusCode(HttpResponse::k200Ok);
 
                 nlohmann::json root;
