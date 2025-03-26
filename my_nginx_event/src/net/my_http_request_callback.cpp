@@ -37,14 +37,14 @@ void CSocket::ngx_http_read_request_handler(lpngx_connection_t pConn)
     Logger::ngx_log_stderr(0, "test!!!!!!!!!!!!!!!!!!!!");
     // 创建消息缓冲区（头部+最大数据空间）
 
-    std::vector<uint8_t> buffer(4* 1024 * 1024);
+    std::vector<uint8_t> buffer(1* 1024 * 1024);
     Logger::ngx_log_stderr(0, "test2!!!!!!!!!!!!!!!!!!!!");
 
     // 接收网络数据
     const ssize_t n = recv(
         pConn->fd,
         buffer.data(),
-        4* 1024 * 1024,
+        1* 1024 * 1024,
         0
     );
     Logger::ngx_log_stderr(0, "test3!!!!!!!!!!!!!!!!!!!!");

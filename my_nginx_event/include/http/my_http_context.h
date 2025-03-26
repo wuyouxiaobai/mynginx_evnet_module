@@ -20,7 +20,7 @@ public:
     
     HttpContext()
     : state_(kExpectRequestLine)
-    {buffer_.reserve(4 * 1024 * 1024);}
+    {buffer_.reserve(2 * 1024 * 1024);}
 
     bool parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chrono::system_clock::time_point receiveTime);
     bool gotAll() const 

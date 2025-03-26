@@ -251,6 +251,7 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                             std::string part_header(reinterpret_cast<const char*>(buffer_.data()) + part_start, header_end - part_start);
                             part_start = header_end + 4; // 跳过头部和空行
                             parsed_pos_ = part_start; // 更新解析位置
+                            body_bytes_received_ += (header_end - part_start + 4);
                             request_.savefileHeader(part_header);
                             if (request_.contentLength() > LARGE_FILE_THRESHOLD) {
                                 // 初始化临时文件写入
@@ -295,9 +296,9 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                             size_t part_end = found != buffer_.end() ? std::distance(buffer_.begin(), found) : std::string::npos;
 
                         
-                            if (part_end == std::string::npos || part_end - boundary_end.size() < needed) {
+                            if (part_end == std::string::npos || (body_bytes_received_ + part_end - boundary_end.size()) < needed) {
                                 // 没有找到完整的 Part 数据
-                                part_end = std::min(needed - boundary_end.size(), buffer_.size());
+                                part_end = std::min(needed - boundary_end.size() - body_bytes_received_, buffer_.size());
                                 // 保存文件内容
                                 if (request_.contentLength() > LARGE_FILE_THRESHOLD)
                                 {
@@ -308,7 +309,14 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                                     request_.appendBody(reinterpret_cast<const char*>(buffer_.data()) + parsed_pos_, part_end - parsed_pos_); 
                                     // request_.savefileHeader(part_header);
                                 }
-                                parsed_pos_ = part_end;
+                                // if(parsed_pos_ > 4 * 1024)
+                                // {
+                                    body_bytes_received_ += (part_end - parsed_pos_);
+                                    parsed_pos_ = part_end;
+                                    std::vector<uint8_t>(buffer_.begin() + parsed_pos_, buffer_.end()).swap(buffer_);
+                                    parsed_pos_ = 0;
+                                // }
+
                                 ok = false;
                                 break;
                             }
@@ -331,10 +339,11 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                                 request_.appendBody(reinterpret_cast<const char*>(buffer_.data()) + parsed_pos_, part_size); 
                                 // request_.savefileHeader(part_header);
                             }
-
+                            // body_bytes_received_ += (part_end - parsed_pos_);
                             // 移动解析位置到 Part 末尾
                             parsed_pos_ = part_end + boundary_end.size();
-
+                            std::vector<uint8_t>(buffer_.begin() + parsed_pos_, buffer_.end()).swap(buffer_);
+                            parsed_pos_ = 0;
                             // ok = true;
                             state_ = kGotAll;
                             break;
@@ -346,7 +355,7 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
             }
             
             case kGotAll:
-                // // 处理完成后滑动窗口
+                // 处理完成后滑动窗口
                 // if (parsed_pos_ > 4096) {
                 //     buffer_.erase(0, parsed_pos_);
                 //     parsed_pos_ = 0;

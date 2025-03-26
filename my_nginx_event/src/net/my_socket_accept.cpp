@@ -94,7 +94,7 @@ void CSocket::ngx_event_accept(lpngx_connection_t oldc)// 建立连接
 
 
         // 在连接建立后设置socket选项
-        int recv_buf_size = 2 * 1024 * 1024;  // 2MB
+        int recv_buf_size = 1 * 1024 * 1024;  // 2MB
         if(setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &recv_buf_size, sizeof(recv_buf_size))==-1)
         {
             Logger::ngx_log_stderr(errno,"setsockopt 在连接建立后设置socket选项 失败.");
