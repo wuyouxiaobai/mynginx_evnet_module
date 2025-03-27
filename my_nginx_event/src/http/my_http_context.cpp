@@ -79,12 +79,15 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                             request_.method() == HttpRequest::kPut) {
                             auto contentLen = request_.getHeader("Content-Length");
                             if (contentLen.empty()) {
+                                Logger::ngx_log_stderr(0, "contentLen.empty()");
                                 isErr = true;
                                 ok = false; // POST/PUT必须包含Content-Length[3](@ref)
                             } else if (!contentLen.empty()) {
+                                Logger::ngx_log_stderr(0, "!contentLen.empty()");
                                 try {
-                                    request_.setContentLength(std::stoi(contentLen));
 
+                                    request_.setContentLength(std::stoi(contentLen));
+                                    Logger::ngx_log_stderr(0, "request_.contentLength() %d", request_.contentLength());
                                     state_ = (request_.contentLength() > 0) ? 
                                             kExpectBody : kGotAll;
                                 } catch (...) {
@@ -93,6 +96,7 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                                 }
                             }
                         } else {
+                            Logger::ngx_log_stderr(0, "非post 或 put");
                             state_ = kGotAll;
                         }
 
@@ -251,7 +255,7 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                             std::string part_header(reinterpret_cast<const char*>(buffer_.data()) + part_start, header_end - part_start);
                             part_start = header_end + 4; // 跳过头部和空行
                             parsed_pos_ = part_start; // 更新解析位置
-                            body_bytes_received_ += (header_end - part_start + 4);
+                            body_bytes_received_ += (part_header.size() + 4);
                             request_.savefileHeader(part_header);
                             if (request_.contentLength() > LARGE_FILE_THRESHOLD) {
                                 // 初始化临时文件写入
@@ -295,7 +299,9 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                             );
                             size_t part_end = found != buffer_.end() ? std::distance(buffer_.begin(), found) : std::string::npos;
 
-                        
+                            Logger::ngx_log_stderr(0, "body_bytes_received_ : %d", body_bytes_received_);
+                            Logger::ngx_log_stderr(0, "part_end : %d", part_end);
+                            Logger::ngx_log_stderr(0, "boundary_end.size() : %d", boundary_end.size());
                             if (part_end == std::string::npos || (body_bytes_received_ + part_end - boundary_end.size()) < needed) {
                                 // 没有找到完整的 Part 数据
                                 part_end = std::min(needed - boundary_end.size() - body_bytes_received_, buffer_.size());
@@ -316,9 +322,11 @@ bool HttpContext::parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chron
                                     std::vector<uint8_t>(buffer_.begin() + parsed_pos_, buffer_.end()).swap(buffer_);
                                     parsed_pos_ = 0;
                                 // }
-
-                                ok = false;
-                                break;
+                                if (part_end == std::string::npos || (body_bytes_received_ + part_end - boundary_end.size()) < needed)
+                                {
+                                    ok = false;
+                                    break;
+                                }
                             }
 
                             size_t part_size = part_end - parsed_pos_;
