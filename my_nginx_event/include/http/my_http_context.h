@@ -33,6 +33,7 @@ public:
         request_.fileWriter_->closeFileStream();
         request_.swap(dummyData);
         buffer_.clear();
+        buffer_.reserve(2 * 1024 * 1024);
         parsed_pos_ = 0;
         body_bytes_received_ = 0;
     }

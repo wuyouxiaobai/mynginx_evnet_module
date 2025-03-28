@@ -86,7 +86,7 @@ void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint
         {
             std::unique_lock<std::mutex> lock(headptr->mtx_context_);
             // 循环等待条件满足，避免虚假唤醒
-            headptr->cv_context_.wait_for(lock, std::chrono::milliseconds(500) , [&]() { 
+            headptr->cv_context_.wait_for(lock, std::chrono::milliseconds(5000) , [&]() { 
                 return headptr->context_->sequence == msghead.sequence; 
             });
 

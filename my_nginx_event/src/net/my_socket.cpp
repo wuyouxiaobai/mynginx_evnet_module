@@ -847,17 +847,26 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                         pMsghead.pConn->psendbuf.append(tmpbuf.peek(), tmpbuf.readableBytes());
                         pMsghead.pConn->sendCount = pMsghead.iCurrsequence;
                         // 发送缓冲区已满，保留未发送数据
+                        Logger::ngx_log_stderr(0, "发送缓冲区已满，保留未发送数据");
                         pSocket->ngx_epoll_oper_event(pMsghead.pConn->fd, EPOLL_CTL_MOD,
                                                     EPOLLOUT, 0, pMsghead.pConn.get());
                     } else {
                         // 其他错误处理（如ECONNRESET）
                         pMsghead.pConn->psendbuf.retrieveAll();
+                        Logger::ngx_log_stderr(0, "其他错误处理（如ECONNRESET）");
                         pSocket->zdClosesocketProc(pMsghead.pConn);
                         // CloseConnection(pConn);
                     }
                 } else {
-                    pMsghead.pConn->psendbuf.retrieveAll();
-                    pSocket->zdClosesocketProc(pMsghead.pConn);
+                    if(sendsize == 0 && pMsghead.pConn->psendbuf.readableBytes() == 0)
+                        Logger::ngx_log_stderr(0, " 发送空数据 ");
+                    else
+                    {
+                        pMsghead.pConn->psendbuf.retrieveAll();
+                        Logger::ngx_log_stderr(0, "其他错误处理（如ECONNRESET）");
+                        pSocket->zdClosesocketProc(pMsghead.pConn);
+                    }
+
                 }
 
                 // 移除已处理消息

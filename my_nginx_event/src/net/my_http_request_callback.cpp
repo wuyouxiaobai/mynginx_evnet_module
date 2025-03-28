@@ -267,7 +267,7 @@ ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送�
         {
             return 0; 
         }
-        if(errno == EINTR) // 内核缓冲区满了
+        if(errno == EAGAIN || errno == EWOULDBLOCK) // 内核缓冲区满了
         {
             return -1;
 
