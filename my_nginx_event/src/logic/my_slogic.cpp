@@ -628,7 +628,7 @@ bool CLogicSocket::InitRouterRegist()
                         resp->setContentType("video/mp4");
                         
                         // 分块读取并构造 chunked 编码数据
-                        const size_t CHUNK_SIZE = 8192;
+                        const size_t CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
                         std::string chunkedBody;
                         size_t bytesRemaining = contentLength;
                         // while (bytesRemaining > 0) {
@@ -657,7 +657,7 @@ bool CLogicSocket::InitRouterRegist()
             resp->setStatusLine(req.getVersion(), HttpResponse::k200Ok, "OK");
             resp->setContentType("video/mp4");
             resp->addHeader("Transfer-Encoding", "chunked");
-            const size_t CHUNK_SIZE = 8192;
+            const size_t CHUNK_SIZE = 1 * 1024 * 1024;
             std::string chunkedBody;
             while (videoFile) {
                 std::vector<char> buffer(CHUNK_SIZE);
