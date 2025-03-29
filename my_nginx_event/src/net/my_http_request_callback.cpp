@@ -159,6 +159,7 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
     // 循环发送直到缓冲区空或出现EAGAIN
     while (true) {
         // pConn->psendbuf.append(payload_str.c_str(), payload_str.size());
+        Logger::ngx_log_stderr(0, " sending............... ");
         ssize_t sendsize = sendproc(pConn, pConn->psendbuf);
         // ssize_t sendsize = sendproc(pConn, pConn->psendbuf);
         Logger::ngx_log_error_core(NGX_LOG_INFO, 0, "ngx_http_write_response_handler 发送数据长度：%d, 发送数据: %s", sendsize, pConn->psendbuf.peek());
@@ -168,6 +169,7 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
             if (pConn->psendbuf.readableBytes() == 0) 
             {
                 // 发送成功，从哪个epoll中干掉；
+                Logger::ngx_log_stderr(errno,"CSocekt::ngx_write_request_handler()中 发送成功。");
                 if(ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD, EPOLLOUT, 1, pConn.get()) == -1) // 覆盖epoll中的写事件
                 {
                     //有这情况发生？这可比较麻烦，不过先do nothing
@@ -181,23 +183,19 @@ void CSocket::ngx_http_write_response_handler(lpngx_connection_t pConn)
                 break;
             }
         } 
-        else if (sendsize == -1) 
-        {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) 
-            {
-                // 注册可写事件继续发送
-                ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD,
-                                EPOLLOUT, 0, pConn.get());
+        else if (sendsize == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                ngx_epoll_oper_event(pConn->fd, EPOLL_CTL_MOD, EPOLLOUT, 0, pConn.get());
                 Logger::ngx_log_stderr(0, "发送缓冲区满，等待再次发送 fd=%d", pConn->fd);
-            } 
-            else 
-            {
-                // 严重错误立即关闭
-                Logger::ngx_log_stderr(errno, "发送失败，关闭连接 fd=%d", pConn->fd);
+            } else if (errno == EPIPE || errno == ECONNRESET) {
+                Logger::ngx_log_stderr(errno, "严重错误（EPIPE/ECONNRESET），关闭连接 fd=%d", pConn->fd);
+                zdClosesocketProc(pConn);
+            } else {
+                Logger::ngx_log_stderr(0, "未知错误，断开连接 fd=%d", pConn->fd);
                 zdClosesocketProc(pConn);
             }
-            break;  
-        }
+            break;
+        }  
         else 
         {
             // 其他错误（如返回0）
@@ -258,7 +256,9 @@ ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送�
     ssize_t n;
     for(;;)
     {
-        n = send(c->fd, buff.peek(), buff.readableBytes(), 0);
+        Logger::ngx_log_stderr(0, "sendproc fd: %d", c->fd);
+
+        n = send(c->fd, buff.peek(), buff.readableBytes(), MSG_NOSIGNAL);
         if(n > 0) // 发送成功
         {
             return n;
@@ -278,12 +278,14 @@ ssize_t CSocket::sendproc(lpngx_connection_t c, Buffer buff)// 将数据发送�
             // 仅打印日志
             Logger::ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
         }
-        else
+        if(errno == EPIPE || errno == ECONNRESET)
         {
-            // 出错，但是不断开socket，等待recv来统一处理断开，因为多线程时处理send和recv断开不容易
-            Logger::ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
-            return -2;
+            return -1;
         }
+        // 出错，但是不断开socket，等待recv来统一处理断开，因为多线程时处理send和recv断开不容易
+        Logger::ngx_log_stderr(errno,"CSocekt::sendproc()中send()失败.");
+        return -2;
+        
     }
 }
 

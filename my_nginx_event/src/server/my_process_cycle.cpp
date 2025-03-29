@@ -56,6 +56,7 @@ int Server::ngx_master_process_cycle()
     sigaddset(&set, SIGWINCH); //终端窗口大小变化
     sigaddset(&set, SIGTERM); //终止进程
     sigaddset(&set, SIGQUIT); //终端退出
+    
     //.........可以根据开发的实际需要往其中添加其他要屏蔽的信号......
 
     //设置，此时无法接受的信号；阻塞期间，你发过来的上述信号，多个会被合并为一个，暂存着，等你放开信号屏蔽后才能收到这些信号。。。

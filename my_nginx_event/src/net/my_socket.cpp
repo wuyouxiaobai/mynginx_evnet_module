@@ -723,7 +723,7 @@ int CSocket::ngx_epoll_process_events(int timer)
             {
                 // --pConn->iThrowsendCount; // 连接断开
                 Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLIN事件发生，连接断开.");
-                zdClosesocketProc(pConn);
+                // zdClosesocketProc(pConn);
             }
             else
             {
@@ -742,7 +742,7 @@ int CSocket::ngx_epoll_process_events(int timer)
             {
                 // --pConn->iThrowsendCount; // 连接断开
                 Logger::ngx_log_stderr(errno,"CSocekt::ngx_epoll_process_events()中EPOLLOUT事件发生，连接断开.");
-                zdClosesocketProc(pConn);
+                // zdClosesocketProc(pConn);
             }
             else
             {
