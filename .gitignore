@@ -1,3 +1,5 @@
 .vscode
 my_nginx_event/video/connectionPool.cpp - mynginx \[SSH_ 192.168.198.4] - Visual Studio Code 2025-03-18 18-14-40.mp4
 my_nginx_event/video/connectionPool.cpp - mynginx \[SSH_ 192.168.198.4] - Visual Studio Code 2025-03-18 18-14-59.mp4
+videoTranscoder/bin
+videoTranscoder/build
