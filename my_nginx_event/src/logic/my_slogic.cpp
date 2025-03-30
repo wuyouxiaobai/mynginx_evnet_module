@@ -359,7 +359,9 @@ bool CLogicSocket::InitRouterRegist()
             resp->setStatusLine(req.getVersion(), HttpResponse::HttpStatusCode::k200Ok, "OK");
             // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
             resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
-            resp->setBody("hello world"); // 直接返回中文文本
+            std::string respstr = "hello world";
+            resp->setBody(respstr); // 直接返回中文文本
+            resp->setContentLength(respstr.size());
         }
     );
 
@@ -377,6 +379,7 @@ bool CLogicSocket::InitRouterRegist()
                 std::string content((std::istreambuf_iterator<char>(file)), 
                                     std::istreambuf_iterator<char>());
                 resp->setBody(content);
+                resp->setContentLength(content.size());
             } else {
                 resp->setStatusCode(HttpResponse::HttpStatusCode::k404NotFound);
                 resp->setBody("HTML File Not Found");
@@ -444,6 +447,7 @@ bool CLogicSocket::InitRouterRegist()
                 resp->setStatusCode(HttpResponse::k200Ok);
                 resp->setContentType("application/json; charset=utf-8");
                 resp->setBody(response.dump());
+                resp->setContentLength(response.dump().size());
     
             } catch (const std::exception& e) {
                 nlohmann::json error = {
@@ -454,6 +458,7 @@ bool CLogicSocket::InitRouterRegist()
                 resp->setStatusCode(HttpResponse::k400BadRequest);
                 resp->setContentType("application/json; charset=utf-8");
                 resp->setBody(error.dump());
+                resp->setContentLength(error.dump().size());
             }
         }
     );
@@ -472,9 +477,11 @@ bool CLogicSocket::InitRouterRegist()
                 std::string content((std::istreambuf_iterator<char>(file)), 
                                     std::istreambuf_iterator<char>());
                 resp->setBody(content);
+                resp->setContentLength(content.size());
             } else {
                 resp->setStatusCode(HttpResponse::HttpStatusCode::k404NotFound);
                 resp->setBody("HTML File Not Found");
+
             }
         }
     );
@@ -540,6 +547,7 @@ bool CLogicSocket::InitRouterRegist()
                 // 设置响应内容（自动序列化）
                 resp->setContentType("application/json");
                 resp->setBody(root.dump());  // 默认无缩进，等同于 Json::FastWriter
+                resp->setContentLength(root.dump().size());
                 return;
             }
 
@@ -565,6 +573,7 @@ bool CLogicSocket::InitRouterRegist()
             resp->setContentType("application/json");
             resp->addHeader("Access-Control-Allow-Origin", "*");
             resp->setBody(fileList.dump());
+            resp->setContentLength(fileList.dump().size());
         }
     );
 
@@ -628,7 +637,7 @@ bool CLogicSocket::InitRouterRegist()
                         resp->setContentType("video/mp4");
                         
                         // 分块读取并构造 chunked 编码数据
-                        const size_t CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
+                        const size_t CHUNK_SIZE = 8 * 1024; // 8kb
                         std::string chunkedBody;
                         size_t bytesRemaining = contentLength;
                         // while (bytesRemaining > 0) {
@@ -657,7 +666,7 @@ bool CLogicSocket::InitRouterRegist()
             resp->setStatusLine(req.getVersion(), HttpResponse::k200Ok, "OK");
             resp->setContentType("video/mp4");
             resp->addHeader("Transfer-Encoding", "chunked");
-            const size_t CHUNK_SIZE = 1 * 1024 * 1024;
+            const size_t CHUNK_SIZE = 8 * 1024;
             std::string chunkedBody;
             while (videoFile) {
                 std::vector<char> buffer(CHUNK_SIZE);

@@ -41,7 +41,7 @@ void HttpResponse::appendToBuffer(std::string& outputBuf) const
         outputBuf.append("\r\n");
     }
     // 必须添加Content-Length
-    outputBuf.append("Content-Length: " + std::to_string(body_.size()) + "\r\n");
+    // outputBuf.append("Content-Length: " + std::to_string(body_.size()) + "\r\n");
 
     outputBuf.append("\r\n");
     
