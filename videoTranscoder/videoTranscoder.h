@@ -1,4 +1,4 @@
-extern "C" {
+extern "C"{
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
@@ -60,6 +60,7 @@ public:
         encoderCtx->framerate = {25, 1};
         encoderCtx->gop_size = 10;
         encoderCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+        encoderCtx->thread_count = 8;  // 启用多线程编码
         avcodec_open2(encoderCtx, encoder, nullptr);
 
         // 5. 创建 HLS 复用器
@@ -116,5 +117,3 @@ private:
     std::string inputFile_;
     std::string outputDir_;
 };
-
-    
