@@ -3,6 +3,7 @@
 #include <utility>
 #include <vector>
 #include "my_socket.h"
+#include <atomic>
 
 
 
@@ -28,6 +29,8 @@ private:
     alignas(64) std::atomic<TaggedPtr> head_;  // 头指针（缓存行对齐）
     alignas(64) std::atomic<TaggedPtr> tail_;   // 尾指针
 
+public:
+    std::atomic<int> size{0};
 public:
     LockFreeQueue() {
         Node* dummy = new Node();
@@ -66,6 +69,7 @@ public:
                         std::memory_order_release,
                         std::memory_order_relaxed)) 
                 {
+                    size.fetch_add(1, std::memory_order_relaxed);
                     break;
                 }
             } else {  // 帮助其他线程推进尾指针
@@ -115,6 +119,7 @@ public:
                         std::memory_order_relaxed)) 
                 {
                     delete old_head.ptr;  // 安全回收旧头节点
+                    size.fetch_sub(1, std::memory_order_relaxed);
                     return true;
                 }
             }

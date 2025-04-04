@@ -348,7 +348,7 @@ for(int i = 0; i < tmpSendThread; i++)
 //清理Tcp发送队列
 void CSocket::clearMsgSendQueue()
 {
-    m_MsgSendQueue.clear();
+    // m_MsgSendQueue.clear();
 
 	// char * sTmpMempoint;
 	// CMemory p_memory = CMemory::getInstance();
@@ -379,9 +379,9 @@ void CSocket::ngx_close_listening_sockets()
 // 将一个待发送消息写入发送队列中
 void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 {
-    std::lock_guard<std::mutex> lock(m_sendMessageQueueMutex);
+    // std::lock_guard<std::mutex> lock(m_sendMessageQueueMutex);
     
-    if (m_MsgSendQueue.size() > 50000) {
+    if (m_MsgSendQueue.size > 50000) {
         ++m_iDiscardSendPkgCount;
         // 可以记录日志，提示队列已满并丢弃了消息
         Logger::ngx_log_stderr(0, "CSocket::msgSend() 发送队列已满，丢弃了一条消息.");
@@ -408,7 +408,7 @@ void CSocket::msgSend(std::string psendbuf, lpngx_connection_t pConn)
 
 
     // 加入发送队列
-    m_MsgSendQueue.emplace_back(msgHeader, std::vector<uint8_t>(psendbuf.begin(), psendbuf.end()));
+    m_MsgSendQueue.Enqueue(std::pair(msgHeader, std::vector<uint8_t>(psendbuf.begin(), psendbuf.end())));
     ++m_iSendMsgQueueCount;
 
     // 发送信号量通知发送线程
@@ -786,16 +786,18 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
         Logger::ngx_log_stderr(errno, "ServerSendQueueThread2...............");
         // 消息队列处理
         {
-            std::lock_guard<std::mutex> lock(pSocket->m_sendMessageQueueMutex);
-            auto it = pSocket->m_MsgSendQueue.begin();
+            // std::lock_guard<std::mutex> lock(pSocket->m_sendMessageQueueMutex);
+            std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>> tmp;
+            pSocket->m_MsgSendQueue.TryDequeue(tmp);
             
-            while (it != pSocket->m_MsgSendQueue.end()) {
-                std::vector<uint8_t>& buf = it->second;
-                STRUC_MSG_HEADER pMsghead = it->first;
+            // while (it != pSocket->m_MsgSendQueue.end())
+            {
+                std::vector<uint8_t> buf = tmp.second;
+                STRUC_MSG_HEADER pMsghead = tmp.first;
                 // 消息头验证
                 if ( pMsghead.pConn->iCurrsequence != pMsghead.iCurrsequence) 
                 {
-                    it = pSocket->m_MsgSendQueue.erase(it);
+                    // it = pSocket->m_MsgSendQueue.erase(it);
                     --pSocket->m_iSendMsgQueueCount;
                     continue;
                 }
@@ -870,7 +872,7 @@ void* CSocket::ServerSendQueueThread(void* threadData) // 专门用来发送数�
                 }
 
                 // 移除已处理消息
-                it = pSocket->m_MsgSendQueue.erase(it);
+                // it = pSocket->m_MsgSendQueue.erase(it);
                 --pSocket->m_iSendMsgQueueCount;
             }
         }

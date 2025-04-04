@@ -330,12 +330,12 @@ private:
     struct epoll_event m_events[NGX_MAX_EVENTS]; // epoll_wait中接受返回的所发生的事件
 
     // 消息队列
-    std::list<std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>> m_MsgSendQueue; // 发送数据消息队列
+    LockFreeQueue<std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>> m_MsgSendQueue; // 发送数据消息队列
     std::atomic<int> m_iSendMsgQueueCount; // 发送消息队列大小
 
     // 多线程相关
     std::vector<std::shared_ptr<ThreadItem>> m_threadVector; // 线程列表
-    std::mutex m_sendMessageQueueMutex; // 发送消息队列互斥锁
+    // std::mutex m_sendMessageQueueMutex; // 发送消息队列互斥锁
     sem_t m_semEventSendQueue; // 处理发送消息相关的信号量
 
     // 时间相关
