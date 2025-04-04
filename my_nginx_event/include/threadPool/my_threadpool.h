@@ -12,6 +12,7 @@
 #include <deque>
 #include "my_logger.h"
 #include "my_socket.h"
+#include "my_lockfreequeue.h"
 
 namespace WYXB
 {
@@ -70,7 +71,7 @@ private:
 
     // 接受消息队列
     std::mutex m_pthreadMutex; // 互斥锁
-    std::list<std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>> m_MsgRecvQueue; // 接收到的消息队列
+    LockFreeQueue<std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>> m_MsgRecvQueue; // 接收到的消息队列
     std::atomic<int> m_iRecvMsgQueueCount{0}; // 接收到的消息队列的数量
     
 

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <thread>
 #include "my_server.h"
+#include <utility>
 
 namespace WYXB
 {
@@ -141,8 +142,8 @@ void CThreadPool::StopAll() // 使线程池中的所有线程停止并退出
 void CThreadPool::inMsgRecvQueueAndSignal(STRUC_MSG_HEADER msghead, std::vector<uint8_t> buf)// 收到消息后，将消息入队，并触发线程池中的线程来处理该消息
 {
     {
-        std::lock_guard<std::mutex> lock(m_pthreadMutex);
-        m_MsgRecvQueue.emplace_back(std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>(msghead, buf)); 
+        // std::lock_guard<std::mutex> lock(m_pthreadMutex);
+        m_MsgRecvQueue.Enqueue(std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>>(msghead, buf)); 
         ++m_iRecvMsgQueueCount; // 原子操作，无需锁
     }
     Call();
@@ -184,25 +185,26 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
 
         Message buf;
         STRUC_MSG_HEADER msghead;
+        // {
+        //     std::unique_lock<std::mutex> lock(pThreadPool->m_pthreadMutex);
+        if(pThread->ifrunning == false)
         {
-            std::unique_lock<std::mutex> lock(pThreadPool->m_pthreadMutex);
-            if(pThread->ifrunning == false)
-            {
-                pThread->ifrunning = true;
-                pThreadPool->m_cv_init.notify_one();
-            }
-
-            pThreadPool->m_cv.wait(lock, [&] {
-                return !pThreadPool->m_MsgRecvQueue.empty() || shutdown;
-            });
-
-            if(shutdown) break;
-            
-            buf = pThreadPool->m_MsgRecvQueue.front().second;
-            msghead = pThreadPool->m_MsgRecvQueue.front().first;
-            pThreadPool->m_MsgRecvQueue.pop_front();
-            pThreadPool->m_iRecvMsgQueueCount.fetch_sub(1, std::memory_order_relaxed);
+            pThread->ifrunning = true;
+            // pThreadPool->m_cv_init.notify_one();
         }
+
+        // pThreadPool->m_cv.wait(lock, [&] {
+        //     return !pThreadPool->m_MsgRecvQueue.empty() || shutdown;
+        // });
+
+        if(shutdown) break;
+        
+        std::pair<STRUC_MSG_HEADER, std::vector<uint8_t>> Node;
+        if(!pThreadPool->m_MsgRecvQueue.TryDequeue(Node)) continue;
+        buf = Node.second;
+        msghead = Node.first;
+        pThreadPool->m_iRecvMsgQueueCount.fetch_sub(1, std::memory_order_relaxed);
+        // }
 
         // 增加正在运行的线程数
         pThreadPool->m_iRunningThreadNum.fetch_add(1, std::memory_order_relaxed);
@@ -273,7 +275,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
 void CThreadPool::clearMsgRecvQueue() // 清空接收到的消息队列
 {
 
-    m_MsgRecvQueue.clear(); // 一行代码解决问题
+    // m_MsgRecvQueue.clear(); // 一行代码解决问题
     // char* buf = NULL;
     // CMemory pMemory = CMemory::getInstance();
 
