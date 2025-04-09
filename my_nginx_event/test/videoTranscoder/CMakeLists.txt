@@ -8,7 +8,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # 查找 FFmpeg 库
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libavutil libswscale libavfilter libavdevice)
+pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libavutil libswscale libavfilter libavdevice libswresample)
 
 # 添加头文件和库目录
 include_directories(${FFMPEG_INCLUDE_DIRS})
