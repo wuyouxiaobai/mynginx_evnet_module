@@ -9,6 +9,7 @@
 #include <fstream> 
 #include "my_macro.h" 
 #include <nlohmann/json.hpp>
+#include "HttpException.h"
 
 namespace WYXB
 {
@@ -251,11 +252,14 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
         middlewareChain_.processAfter(*resp);
         // Logger::ngx_log_stderr(0, "middlewareChain_ processAfter后 .........");
     }
-    catch (const HttpResponse& res) 
+    catch (const HttpException& ex) 
     {
         // 处理中间件抛出的响应（如CORS预检请求）
+        resp->setStatusCode(ex.code());
+        resp->setStatusMessage(ex.what());
+        resp->setBody("Error: " + std::string(ex.what()));
         Logger::ngx_log_stderr(0, "处理中间件抛出的响应 .........");
-        *resp = res;
+
     }
     catch (const std::exception& e) 
     {
