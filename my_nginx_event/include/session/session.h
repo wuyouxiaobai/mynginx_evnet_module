@@ -29,6 +29,10 @@ public:
     SessionManager* getManager() const 
     { return sessionManager_; }
 
+    int getMaxAge(){return maxAge_;}
+
+    std::unordered_map<std::string, std::string> getAllData(){return data_;}
+
     // 数据存取
     void setValue(const std::string&key, const std::string&value);
     std::string getValue(const std::string&key) const;

@@ -42,6 +42,7 @@ std::shared_ptr<Session> SessionManager::getSession(const HttpRequest& req, Http
 }
 
 // 生成唯一的会话标识符，确保会话的唯一性和安全性
+// 生成长度32的十六进制数
 std::string SessionManager::generateSessionId()
 {
     std::stringstream ss;
