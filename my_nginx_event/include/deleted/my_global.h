@@ -3,7 +3,7 @@
 // #include <stdlib.h>
 // #include "my_slogic.h"
 // #include "my_threadpool.h"
-// #include <atomic>
+#include <atomic>
 
 // namespace WYXB
 // {
