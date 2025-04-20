@@ -6,6 +6,8 @@
 #include <atomic>
 #include <queue>
 #include <string>
+#include <vector>
+#include <functional>
 
 #include "my_slogic.h"
 #include "my_threadpool.h"
@@ -79,6 +81,13 @@ public:
         Logger::ngx_log_close();
     }
 
+    // 注册控制器
+    template<typename ControllerType>
+    void registerController() {
+        ControllerType ctl;
+        ctl.registerRoutes(*this);
+    }
+
     // 信号处理器（静态 -> 实例）
     static void static_ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext) {
         instance().ngx_signal_handler(signo, siginfo, ucontext);
@@ -133,5 +142,6 @@ public:
     std::shared_ptr<CThreadPool> g_threadpool;
     std::shared_ptr<CLogicSocket> g_socket;
 };
+
 
 } // namespace WYXB
