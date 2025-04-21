@@ -35,6 +35,9 @@ void RedisSessionStorage::save(std::shared_ptr<Session> session) {
 }
 
 std::shared_ptr<Session> RedisSessionStorage::load(const std::string& sessionId) {
+
+
+
     std::string key = "session:" + sessionId;
     std::string jsonStr = redis_->get(key);
     if (jsonStr.empty()) return nullptr;
@@ -43,7 +46,13 @@ std::shared_ptr<Session> RedisSessionStorage::load(const std::string& sessionId)
     doc.Parse(jsonStr.c_str());
     if (!doc.IsObject()) return nullptr;
 
-    auto session = std::make_shared<Session>(sessionId);
+
+    int maxAge = 3600;
+    if(doc.HasMember("maxAge") && doc["maxAge"].IsInt())
+    {
+        maxAge = doc["maxAge"].GetInt();
+    }
+    auto session = std::make_shared<Session>(sessionId, sessionManager_.lock().get(), maxAge);
 
     if (doc.HasMember("data")) {
         for (auto it = doc["data"].MemberBegin(); it != doc["data"].MemberEnd(); ++it) {

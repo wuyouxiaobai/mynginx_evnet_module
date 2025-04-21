@@ -39,3 +39,4 @@ link_directories(/usr/lib/x86_64-linux-gnu)  # 库路径
 add_executable(httpserver ${SOURCES})
 # 链接库
 target_link_libraries(${PROJECT_NAME} mysqlclient)  
+target_link_libraries(${PROJECT_NAME} hiredis)

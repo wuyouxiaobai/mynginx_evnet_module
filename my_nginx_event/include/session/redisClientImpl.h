@@ -1,3 +1,4 @@
+#pragma once
 #include <hiredis/hiredis.h>
 #include <stdexcept>
 
