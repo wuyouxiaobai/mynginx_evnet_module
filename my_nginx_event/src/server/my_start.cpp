@@ -6,7 +6,7 @@ std::atomic<int> Server::g_stopEvent{0};
 std::atomic<int> Server::ngx_pid{-1}; //当前进程
 std::atomic<int> Server::ngx_parent{-1}; //父进程
 
-int Server::start(int argc, char*const *argv)
+int Server::run(int argc, char*const *argv)
 {
     int exitcode = 0;           //退出代码，先给0表示正常退出
     int i;                      //临时用

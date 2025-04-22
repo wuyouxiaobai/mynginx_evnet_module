@@ -1,153 +1,437 @@
 #include "my_server.h"
 
-// namespace WYXB
-// {
 
-// // //本文件用的函数声明
-// // static void freeresource(); //释放资源
+/// 路由相关
+// 初始化时注册
+// 文件重命名
+std::string urlDecode(const std::string &src) {
+    std::string ret;
+    size_t length = src.length();
+    for (size_t i = 0; i < length; ++i) {
+        char ch = src[i];
+        if (ch == '%') {
+            // 确保后面有两个字符可以解析
+            if (i + 2 >= length) {
+                throw std::runtime_error("Invalid URL encoding.");
+            }
+            std::string hexStr = src.substr(i + 1, 2);
+            int hexValue;
+            std::istringstream iss(hexStr);
+            iss >> std::hex >> hexValue;
+            ret += static_cast<char>(hexValue);
+            i += 2; // 跳过两个已经解析的字符
+        } else if (ch == '+') {
+            ret += ' ';
+        } else {
+            ret += ch;
+        }
+    }
+    return ret;
+}
 
-// // //和设置标题有关的全局变量
-// // size_t g_argvneedmem = 0; //保存下argv参数需要的内存大小
-// // size_t g_envneedmem = 0; //保存下环境变量需要的内存大小
-// // int g_os_argc;//参数个数
-// // char **g_os_argv;//原始命令行参数数组，在main中被赋值
-// // char *gp_envmem=NULL;//指向自己分配的env环境变量的内存，在ngx_init_setproctitle()函数中会被分配内存
-// // int g_daemonized = 0;//是否以守护进程运行，开启:1 关闭:0
+std::string sanitizeFilename(const std::string& rawFilename) {
+    // 1. URL 解码
+    std::string decoded = urlDecode(rawFilename);
 
-// // //CSocket的全局变量
-// // WYXB::CLogicSocket g_socket; //socket通信的逻辑层对象
-// // WYXB::CThreadPool g_threadpool; //线程池对象
+    // 2. 去除非法字符（例如只允许字母、数字、下划线和点）
+    std::string safe;
+    for (char c : decoded) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.')
+            safe.push_back(c);
+        else
+            safe.push_back('_');
+    }
 
-// // //进程本身相关的全局变量
-// // pid_t ngx_pid; //当前进程
-// // pid_t ngx_parent; //父进程
-// // int ngx_process; //进程类型
-// // int g_stopEvent;//进程退出事，退出：1 继续：0
-// // int ngx_terminate;//进程优雅退出：1 继续：0
-// // pid_t ngx_processes[NGX_MAX_PROCESSES]; // 定义一个固定大小的数组  
-// // int ngx_last_process;//工作进程数量
+    // 3. 分离文件扩展名（最后一个点后的部分）
+    std::string baseName = safe;
+    std::string extension;
+    size_t pos = safe.rfind('.');
+    if (pos != std::string::npos) {
+        baseName = safe.substr(0, pos);    // 主文件名
+        extension = safe.substr(pos);      // 包含点的扩展名
+    }
+
+    // 4. 限制主文件名长度（不包括扩展名）
+    const size_t MAX_BASENAME_LENGTH = 10; // 例如：最大10个字符
+    if (baseName.length() > MAX_BASENAME_LENGTH) {
+        baseName = baseName.substr(0, MAX_BASENAME_LENGTH);
+    }
+
+    // 5. 重新拼接文件名
+    return baseName + extension;
+}
 
 
-// // sig_atomic_t ngx_reap; //标记子进程状态变化[一般是子进程发来SIGCHLD信号表示退出],sig_atomic_t:系统定义的类型：访问或改变这些变量需要在计算机的一条指令内完成
-// //                                    //一般等价于int【通常情况下，int类型的变量通常是原子访问的，也可以认为 sig_atomic_t就是int类型的数据】       
-
-
-// }
-
-//程序主入口函数--------------------------------------
 int main(int argc, char*const *argv)
 {
     WYXB::Server server;
-    int exitcode = server.start(argc, argv);
+
+    int exitcode = server.run(argc, argv);
+    // 示例：注册动态路径心跳
+    // server.get(  
+    //     "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
+    //     [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+    //         resp->setStatusCode(WYXB::HttpResponse::HttpStatusCode::k200Ok);
+    //         resp->setBody("Dynamic PONG");
+    //     }
+    // );
+
+
+    server.get( 
+        "/hello", 
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+            // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
+            resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
+            std::string respstr = "hello world";
+            resp->setBody(respstr); // 直接返回中文文本
+            resp->setContentLength(respstr.size());
+        }
+    );
+
+    // 新增HTML文件路由
+    server.get( 
+        "/getposthtml",
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            // 设置响应头
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("text/html; charset=utf-8");
+            // 读取HTML文件
+            std::ifstream file("../html/posttest.html", std::ios::in | std::ios::binary);
+            if (file) {
+                std::string content((std::istreambuf_iterator<char>(file)), 
+                                    std::istreambuf_iterator<char>());
+                resp->setBody(content);
+                resp->setContentLength(content.size());
+            } else {
+                resp->setStatusCode(WYXB::HttpResponse::HttpStatusCode::k404NotFound);
+                resp->setBody("HTML File Not Found");
+            }
+        }
+    );
+
+    server.post(
+        "/submit",
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            try {
+                
+                // 设置响应头
+                resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+                resp->setContentType("text/html; charset=utf-8");
+                // 解析表单数据
+                std::vector<uint8_t> body = req.getBody();
+                std::string prefix = "testData=";
+                // 将字符串转换为字节序列
+                std::vector<uint8_t> prefix_bytes(prefix.begin(), prefix.end());
+
+                // 使用 std::search 算法查找字节序列
+                auto it = std::search(
+                    body.begin(), 
+                    body.end(),
+                    prefix_bytes.begin(),
+                    prefix_bytes.end()
+                );
+
+                // 判断是否找到并计算位置
+                size_t pos = (it != body.end()) ? std::distance(body.begin(), it) : std::string::npos;
+                
+                if (pos == std::string::npos) {
+                    throw std::runtime_error("Invalid form data");
+                }
+    
+                // URL解码并获取值
+                auto start = body.begin() + pos + prefix.size();
+                std::vector<uint8_t> encoded(start, body.end());
+                std::string encoded_str(encoded.begin(), encoded.end());
+                std::string decoded;
+                for (size_t i = 0; i < encoded.size(); ++i) {
+                    if (encoded_str[i] == '%' && i+2 < encoded_str.size()) {
+                        int hex;
+                        sscanf(encoded_str.substr(i+1,2).c_str(), "%x", &hex);
+                        decoded += static_cast<char>(hex);
+                        i += 2;
+                    } else if (encoded_str[i] == '+') {
+                        decoded += ' ';
+                    } else {
+                        decoded += encoded_str[i];
+                    }
+                }
+    
+                // 构造JSON响应
+                nlohmann::json response = {
+                    {"status", "success"},
+                    {"message", "数据接收成功"},
+                    {"input", decoded},
+                    {"length", decoded.length()},
+                    {"timestamp", static_cast<long>(std::time(nullptr))}
+                };
+    
+                resp->setStatusCode(WYXB::HttpResponse::k200Ok);
+                resp->setContentType("application/json; charset=utf-8");
+                resp->setBody(response.dump());
+                resp->setContentLength(response.dump().size());
+    
+            } catch (const std::exception& e) {
+                nlohmann::json error = {
+                    {"status", "error"},
+                    {"error_type", "invalid_request"},
+                    {"message", e.what()}
+                };
+                resp->setStatusCode(WYXB::HttpResponse::k400BadRequest);
+                resp->setContentType("application/json; charset=utf-8");
+                resp->setBody(error.dump());
+                resp->setContentLength(error.dump().size());
+            }
+        }
+    );
+
+
+    server.get(
+        "/gethtml",
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            // 设置响应头
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("text/html; charset=utf-8");
+            // 读取HTML文件
+            std::ifstream file("../html/test.html", std::ios::in | std::ios::binary);
+            if (file) {
+                std::string content((std::istreambuf_iterator<char>(file)), 
+                                    std::istreambuf_iterator<char>());
+                resp->setBody(content);
+                resp->setContentLength(content.size());
+            } else {
+                resp->setStatusCode(WYXB::HttpResponse::HttpStatusCode::k404NotFound);
+                resp->setBody("HTML File Not Found");
+
+            }
+        }
+    );
+
+    server.post(
+        "/uploadvideo",
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) 
+        {
+            // 1. 确保上传目录存在
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+            
+            WYXB::Logger::ngx_log_stderr(0 ,"uploadvideo test");
+            const std::string uploadDir = "../video/";
+            if (!std::filesystem::exists(uploadDir)) {
+                std::filesystem::create_directories(uploadDir);
+            }
+    
+            // 2. 解析Content-Type获取boundary
+            std::string fileHeader = req.getfileHeader();
+            if (fileHeader.empty()) {
+                resp->setStatusCode(WYXB::HttpResponse::k400BadRequest);
+                resp->setBody("Invalid Content-Type");
+                return;
+            }
+    
+            // 3. 获取原始请求体
+            std::vector<uint8_t> body = req.getBody();
+
+    
+            // 查找文件名
+            size_t namePos = fileHeader.find("filename=\"");
+            if (namePos != std::string::npos) {
+                size_t endQuote = fileHeader.find("\"", namePos + 10);
+                std::string filename = fileHeader.substr(
+                    namePos + 10,
+                    endQuote - (namePos + 10)
+                );
+
+
+                if(req.contentLength() <= 1 * 1024 * 1024)
+                {
+                    // 保存文件
+                    filename = sanitizeFilename(filename);
+                    std::ofstream out(uploadDir + filename, std::ios::binary);
+                    out.write(reinterpret_cast<const char*>(body.data()), body.size() * sizeof(body[0]));
+                }
+                resp->setStatusCode(WYXB::HttpResponse::k200Ok);
+
+                nlohmann::json root;
+                root["status"] = "success";
+                root["message"] = "Upload success";
+                
+                // 遍历目录获取文件列表
+                std::vector<std::string> newList;
+                for (const auto& entry : std::filesystem::directory_iterator(uploadDir)) {
+                    newList.push_back(entry.path().filename().string());
+                }
+                
+                // 直接将 vector 赋值给 JSON 数组（自动转换）
+                root["files"] = newList;  // 或使用 root["files"] = nlohmann::json::array(newList);
+                
+                // 设置响应内容（自动序列化）
+                resp->setContentType("application/json");
+                resp->setBody(root.dump());  // 默认无缩进，等同于 Json::FastWriter
+                resp->setContentLength(root.dump().size());
+                return;
+            }
+
+
+    
+            // 未找到有效文件
+            resp->setStatusCode(WYXB::HttpResponse::k400BadRequest);
+            resp->setBody("No video file received");
+        }
+    );
+    
+    server.get(
+        "/getvideos",
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            const std::string videoDir = "../video/";
+            nlohmann::json fileList = nlohmann::json::array();
+            
+            for (const auto& entry : std::filesystem::directory_iterator(videoDir)) {
+                fileList.push_back(entry.path().filename().string());
+            }
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+            resp->setContentType("application/json");
+            resp->addHeader("Access-Control-Allow-Origin", "*");
+            resp->setBody(fileList.dump());
+            resp->setContentLength(fileList.dump().size());
+        }
+    );
+
+
+    server.get(
+        "/video/:filename",
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            // 获取 '/video/' 后面的文件名
+            std::string path = req.path().substr(7);
+            std::string videoPath = "../video/" + path;
+            
+            // 文件不存在处理
+            if (!std::filesystem::exists(videoPath)) {
+                WYXB::Logger::ngx_log_stderr(0, "Video not found");
+                resp->setStatusCode(WYXB::HttpResponse::k404NotFound);
+                resp->setBody("Video not found");
+                return;
+            }
+            
+            // 获取文件总大小
+            std::uintmax_t fileSize = std::filesystem::file_size(videoPath);
+            
+            // 打开文件流
+            std::ifstream videoFile(videoPath, std::ios::binary);
+            if (!videoFile) {
+                resp->setStatusCode(WYXB::HttpResponse::k500InternalServerError);
+                resp->setBody("Failed to open video file");
+                return;
+            }
+            
+            // 检查是否存在 Range 请求头
+            std::string rangeHeader = req.getHeader("Range");
+            if (!rangeHeader.empty()) {
+                size_t pos = rangeHeader.find('=');
+                if (pos != std::string::npos) {
+                    std::string rangeSpec = rangeHeader.substr(pos + 1);
+                    size_t dashPos = rangeSpec.find('-');
+                    if (dashPos != std::string::npos) {
+                        // 解析起始字节
+                        long long start = std::stoll(rangeSpec.substr(0, dashPos));
+                        long long end = fileSize - 1;  // 默认到文件末尾
+                        if (dashPos + 1 < rangeSpec.size() && !rangeSpec.substr(dashPos + 1).empty()) {
+                            end = std::stoll(rangeSpec.substr(dashPos + 1));
+                        }
+                        if (start > end || end >= fileSize) {
+                            resp->setStatusCode(WYXB::HttpResponse::k416RangeNotSatisfiable);
+                            resp->setBody("Requested Range Not Satisfiable");
+                            return;
+                        }
+                        
+                        // 计算需要传输的字节数
+                        std::size_t contentLength = static_cast<std::size_t>(end - start + 1);
+                        videoFile.seekg(start);
+                        
+                        // 设置响应头：206状态，Content-Range 以及 chunked 编码（不指定 Content-Length）
+                        resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::k206PartialContent, "Partial Content");
+                        resp->addHeader("Content-Range", "bytes " + std::to_string(start) + "-" + std::to_string(end) + "/" + std::to_string(fileSize));
+                        resp->addHeader("Accept-Ranges", "bytes");
+                        resp->addHeader("Transfer-Encoding", "chunked");
+                        resp->setContentType("video/mp4");
+                        
+                        // 分块读取并构造 chunked 编码数据
+                        const size_t CHUNK_SIZE = 8 * 1024; // 8kb
+                        std::string chunkedBody;
+                        size_t bytesRemaining = contentLength;
+                        // while (bytesRemaining > 0) {
+                            size_t toRead = std::min(CHUNK_SIZE, bytesRemaining);
+                            std::vector<char> buffer(toRead);
+                            videoFile.read(buffer.data(), toRead);
+                            std::streamsize bytesRead = videoFile.gcount();
+                            if (bytesRead <= 0) return;
+                            // 构造当前 chunk，格式为：<chunk size in hex>\r\n<data>\r\n
+                            std::ostringstream oss;
+                            oss << std::hex << bytesRead << "\r\n";
+                            chunkedBody.append(oss.str());
+                            chunkedBody.append(buffer.data(), bytesRead);
+                            chunkedBody.append("\r\n");
+                            bytesRemaining -= bytesRead;
+                        // }
+                        // 添加终止 chunk
+                        chunkedBody.append("0\r\n\r\n");
+                        resp->setBody(chunkedBody);
+                        return;
+                    }
+                }
+            }
+            
+            // 如果没有 Range 请求，返回整个文件（使用 chunked 传输）
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::k200Ok, "OK");
+            resp->setContentType("video/mp4");
+            resp->addHeader("Transfer-Encoding", "chunked");
+            const size_t CHUNK_SIZE = 8 * 1024;
+            std::string chunkedBody;
+            while (videoFile) {
+                std::vector<char> buffer(CHUNK_SIZE);
+                videoFile.read(buffer.data(), CHUNK_SIZE);
+                std::streamsize bytesRead = videoFile.gcount();
+                if (bytesRead <= 0)
+                    break;
+                std::ostringstream oss;
+                oss << std::hex << bytesRead << "\r\n";
+                chunkedBody.append(oss.str());
+                chunkedBody.append(buffer.data(), bytesRead);
+                chunkedBody.append("\r\n");
+            }
+            chunkedBody.append("0\r\n\r\n");
+            resp->setBody(chunkedBody);
+        }
+    );
+    
+    
+    
+    
+    // m_Router->registerCallback(
+    //     HttpRequest::Method::kGet,
+    //     "/getvideo/(.+)", // 正则匹配文件名
+    //     [](const HttpRequest& req, HttpResponse* resp) {
+    //         const std::string videoPath = "../video/" + req.getPath().substr(10); // 提取文件名
+            
+    //         std::ifstream file(videoPath, std::ios::binary | std::ios::ate);
+    //         if (!file) {
+    //             resp->setStatusCode(HttpResponse::k404NotFound);
+    //             return;
+    //         }
+    
+    //         // 设置视频流响应头
+    //         resp->setContentType("video/mp4");
+    //         resp->addHeader("Accept-Ranges", "bytes");
+            
+    //         // 读取文件内容
+    //         std::streamsize size = file.tellg();
+    //         file.seekg(0, std::ios::beg);
+    //         std::vector<char> buffer(size);
+    //         if (file.read(buffer.data(), size)) {
+    //             resp->setBody(std::string(buffer.data(), buffer.size()));
+    //         }
+    //     }
+    // );
+
     return exitcode;
-
-
-//     int exitcode = 0;           //退出代码，先给0表示正常退出
-//     int i;                      //临时用
-    
-//     WYXB::g_stopEvent = 0;            //标记程序是否退出，0不退出    
-//     WYXB::ngx_terminate = 0;          ////标记程序是否要优雅退出，0不终止      
-    
-//     WYXB::ngx_pid = getpid();         //获取当前进程的PID
-//     WYXB::ngx_parent = getppid();      //获取父进程的PID
-//     WYXB::ngx_last_process = 0;      //工作进程数量
-    
-//     //统计argc所占内存
-//     WYXB::g_argvneedmem = 0;
-//     for(i=0;i<argc;i++) //argv =  ./nginx -a -b -c asdfas
-//     {
-//         WYXB::g_argvneedmem += strlen(argv[i]) + 1; //+1是为了保存每个参数的结束符'\0'
-//     }
-//     //统计环境变量所占的内存。注意判断方法是environ[i]是否为空作为环境变量结束标记
-//     for(i=0;environ[i];i++)
-//     {
-//         WYXB::g_envneedmem += strlen(environ[i]) + 1;
-//     }
-    
-//     WYXB::g_os_argc = argc; //保存参数个数
-//     WYXB::g_os_argv = (char**)argv; //保存原始命令行参数数组
-    
-//     //全局变量必要初始化
-//     // WYXB::my_log.fd = -1; //-1：表示日志文件尚未打开；因为后边ngx_log_stderr要用所以这里先给-1
-//     WYXB::ngx_process = NGX_PROCESS_MASTER; //本进程类型：主进程
-//     WYXB::ngx_reap = 0; //标记子进程状态变化
-    
-//     WYXB::MyConf* myconf = WYXB::MyConf::getInstance(); //配置文件对象
-//     if(myconf->LoadConf("nginx.conf") == false)//把配置文件内容载入到内存
-//     {
-//         WYXB::Logger::ngx_log_init();    //初始化日志
-//         WYXB::Logger::ngx_log_stderr(0,"配置文件[%s]载入失败，退出!","nginx.conf");
-//         //exit(1);终止进程，在main中出现和return效果一样 ,exit(0)表示程序正常, exit(1)/exit(-1)表示程序异常退出，exit(2)表示表示系统找不到指定的文件
-//         exitcode = 2; //标记找不到文件
-//         goto lblexit;
-//     }
-//     // WYXB::CMemory::getInstance();
-//     // WYXB::CRC32::getInstance();
-//     WYXB::Logger::ngx_log_init();             //日志初始化(创建/打开日志文件)，这个需要配置项，所以必须放配置文件载入的后边；     
-    
-//     if(WYXB::ngx_init_signals() != 0) //信号初始化
-//     {
-//         exitcode = 1;
-//         goto lblexit;
-//     }
-//     if(WYXB::g_socket.Initialize() == false)
-//     {
-//         exitcode = 1;
-//         goto lblexit;
-//     }
-
-//     WYXB::ngx_init_setproctitle();    //把环境变量搬家
-    
-//     //--------------------------------------
-//     //创建守护进程
-//     if(myconf->GetIntDefault("Daemon",0) == 1)//读配置文件，拿到配置文件中是否按守护进程方式启动的选项
-//     {
-//         //1：按照守护进程方式运行
-//         int cdaemonresult = WYXB::ngx_daemon();
-//         if(cdaemonresult == -1) //fork()失败
-//         {
-//             exitcode = 1;    //标记失败
-//             goto lblexit;
-//         }
-//         if(cdaemonresult == 1)
-//         {
-//             WYXB::freeresource();   //只有进程退出了才goto到 lblexit，用于提醒用户进程退出了
-//                               //而我现在这个情况属于正常fork()守护进程后的正常退出，不应该跑到lblexit()，接下来交给守护进程
-//             exitcode = 0;
-//             return exitcode;  //整个进程直接在这里退出
-//         }
-//         WYXB::g_daemonized = 1;    //守护进程标记，标记是否启用了守护进程模式，0：未启用，1：启用了
-//     }
-//     WYXB::ngx_master_process_cycle(); //不管父进程还是子进程，正常工作期间都在这个函数里循环；
-
-// lblexit:
-//     //(5)该释放的资源要释放掉
-//     if(WYXB::ngx_process == NGX_PROCESS_MASTER)
-//         WYXB::Logger::ngx_log_stderr(0,"程序退出，再见了!");
-//     WYXB::freeresource();  //一系列的main返回前的释放动作函数
-//     //printf("程序退出，再见!\n");    
-//     return exitcode;
 }
 
-// namespace WYXB
-// {
-
-// void freeresource()
-// {
-//     //(1)对于因为设置可执行程序标题导致的环境变量分配的内存，我们应该释放
-//     if(gp_envmem)
-//     {
-//         delete []gp_envmem;
-//         gp_envmem = NULL;
-//     }
-
-//     Logger::ngx_log_close();
-//     // //(2)关闭日志文件
-//     // if(WYXB::my_log.fd != STDERR_FILENO && WYXB::my_log.fd != -1)  
-//     // {        
-//     //     close(WYXB::my_log.fd); //不用判断结果了
-//     //     WYXB::my_log.fd = -1; //标记下，防止被再次close吧        
-//     // }
-// }
-
-// }
