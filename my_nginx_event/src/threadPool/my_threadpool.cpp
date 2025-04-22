@@ -190,7 +190,7 @@ void* CThreadPool::ThreadFunc(void* threadData) // 新线程的线程回调函�
         if(pThread->ifrunning == false)
         {
             pThread->ifrunning = true;
-            // pThreadPool->m_cv_init.notify_one();
+            pThreadPool->m_cv_init.notify_one();
         }
 
         // pThreadPool->m_cv.wait(lock, [&] {
