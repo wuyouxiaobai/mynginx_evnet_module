@@ -64,9 +64,7 @@ std::string sanitizeFilename(const std::string& rawFilename) {
 
 int main(int argc, char*const *argv)
 {
-    WYXB::Server server;
-
-    int exitcode = server.run(argc, argv);
+    
     // 示例：注册动态路径心跳
     // server.get(  
     //     "/heartbeat/\\d+",  // 匹配类似 /heartbeat/123
@@ -77,7 +75,7 @@ int main(int argc, char*const *argv)
     // );
 
 
-    server.get( 
+    WYXB::Server::instance().get( 
         "/hello", 
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
@@ -90,7 +88,7 @@ int main(int argc, char*const *argv)
     );
 
     // 新增HTML文件路由
-    server.get( 
+    WYXB::Server::instance().get( 
         "/getposthtml",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             // 设置响应头
@@ -110,7 +108,7 @@ int main(int argc, char*const *argv)
         }
     );
 
-    server.post(
+    WYXB::Server::instance().post(
         "/submit",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             try {
@@ -186,7 +184,7 @@ int main(int argc, char*const *argv)
     );
 
 
-    server.get(
+    WYXB::Server::instance().get(
         "/gethtml",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             // 设置响应头
@@ -207,7 +205,7 @@ int main(int argc, char*const *argv)
         }
     );
 
-    server.post(
+    WYXB::Server::instance().post(
         "/uploadvideo",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) 
         {
@@ -279,7 +277,7 @@ int main(int argc, char*const *argv)
         }
     );
     
-    server.get(
+    WYXB::Server::instance().get(
         "/getvideos",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             const std::string videoDir = "../video/";
@@ -297,7 +295,7 @@ int main(int argc, char*const *argv)
     );
 
 
-    server.get(
+    WYXB::Server::instance().get(
         "/video/:filename",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             // 获取 '/video/' 后面的文件名
@@ -431,7 +429,7 @@ int main(int argc, char*const *argv)
     //         }
     //     }
     // );
-
+    int exitcode = WYXB::Server::instance().run(argc, argv);
     return exitcode;
 }
 

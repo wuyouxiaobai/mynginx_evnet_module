@@ -16,7 +16,7 @@ class CLogicSocket : public CSocket
 
 
 public:
-    CLogicSocket() = default;
+    CLogicSocket() : m_Router(std::make_shared<Router>()){}
     virtual ~CLogicSocket() = default;
     virtual bool Initialize();
 
@@ -31,7 +31,6 @@ private:
 
     std::shared_ptr<Router> m_Router;
     void InitRouter() {
-        m_Router = std::make_shared<Router>();
         InitRouterRegist();
     }
     // 初始化时注册

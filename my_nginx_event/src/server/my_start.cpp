@@ -87,11 +87,11 @@ int Server::run(int argc, char*const *argv)
     ngx_master_process_cycle(); //不管父进程还是子进程，正常工作期间都在这个函数里循环；
 
 lblexit:
-    //(5)该释放的资源要释放掉
+
     if(ngx_process == NGX_PROCESS_MASTER)
         Logger::ngx_log_stderr(0,"程序退出，再见了!");
-    freeresource();  //一系列的main返回前的释放动作函数
-    //printf("程序退出，再见!\n");    
+    freeresource(); 
+ 
     return exitcode;
 }
 }

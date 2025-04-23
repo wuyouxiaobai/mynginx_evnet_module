@@ -230,13 +230,13 @@ friend class CSocket;
 friend class CLogicSocket;
 friend class Logger;
 
-public:
+private:
     Server() : 
         g_socket(std::make_shared<CLogicSocket>()), 
         g_threadpool(std::make_shared<CThreadPool>()) {}
 
     ~Server() = default;
-
+public:
     static Server& instance() {
         static Server server;
         return server;
