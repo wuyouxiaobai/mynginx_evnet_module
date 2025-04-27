@@ -22,6 +22,7 @@ public:
         k404NotFound = 404,
         k409Conflict = 409,
         k416RangeNotSatisfiable = 416,
+        k429TooManyRequests = 429,
         k500InternalServerError = 500,
         k503ServiceUnavailable = 503
     };

@@ -661,7 +661,7 @@ int CSocket::ngx_epoll_process_events(int timer)
     {
         auto Connptr = static_cast<ngx_connection_s*>(m_events[i].data.ptr);
         lpngx_connection_t pConn = Connptr->shared_from_this();
-
+        
 
         //事件没有过期
         revents = m_events[i].events;

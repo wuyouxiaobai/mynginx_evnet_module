@@ -58,8 +58,7 @@ private:
     std::ofstream fileStream_;  // 大文件上传的视频流
 };
 
-
-
+struct ngx_connection_s;
 class HttpRequest
 {
     friend class HttpContext;
@@ -197,7 +196,9 @@ public:
 
 
 
-        
+    void setConnection(const std::shared_ptr<ngx_connection_s>& conn);
+
+    std::string getPeerIp() const;
 
 
 
@@ -219,6 +220,8 @@ private:
     std::unordered_map<std::string, std::string> formFields_;
     // 用于保存上传的文件名列表
     std::vector<std::string>                     uploadedFiles_;
+
+    std::weak_ptr<ngx_connection_s>              connection_;
 
 private:
     // 从 partHeader 中解析出表单字段名，例如查找 name="xxx"

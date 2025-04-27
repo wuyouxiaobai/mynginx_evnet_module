@@ -10,7 +10,7 @@
 namespace WYXB {
 
 // 构造函数：初始化 HttpContext
-ngx_connection_s::ngx_connection_s() : context_(std::make_shared<HttpContext>()) {}
+ngx_connection_s::ngx_connection_s() {}
 
 // 析构函数：关闭 socket
 ngx_connection_s::~ngx_connection_s() {
@@ -48,6 +48,7 @@ std::shared_ptr<HttpContext> ngx_connection_s::getContext() {
 void CSocket::initconnection() {
     for (int i = 0; i < m_worker_connections; ++i) {
         lpngx_connection_t p_Conn = std::make_shared<ngx_connection_s>();
+        p_Conn->context_ = std::make_shared<HttpContext>(p_Conn);
         p_Conn->GetOneToUse(-1);
         p_Conn->id = i;
         m_connectionList.emplace_back(p_Conn);
@@ -70,6 +71,7 @@ lpngx_connection_t CSocket::ngx_get_connection(int isock) {
         auto create_connection = [&] {
             for (int i = 0; i < m_worker_connections; ++i) {
                 lpngx_connection_t p_Conn = std::make_shared<ngx_connection_s>();
+                p_Conn->context_ = std::make_shared<HttpContext>(p_Conn);
                 p_Conn->GetOneToUse(-1);
                 p_Conn->id = i + m_total_connection_n;
                 m_connectionList.emplace_back(p_Conn);

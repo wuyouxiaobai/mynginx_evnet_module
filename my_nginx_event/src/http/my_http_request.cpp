@@ -1,5 +1,8 @@
 #include "my_http_request.h"
 #include <cassert>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include "my_socket.h"
 
 namespace WYXB
 {
@@ -136,9 +139,27 @@ void HttpRequest::swap(HttpRequest &that)
     std::swap(fileHeader_, that.fileHeader_);
     std::swap(formFields_, that.formFields_);
     std::swap(uploadedFiles_, that.uploadedFiles_);
+    std::swap(connection_, that.connection_);
     
 }
 
+void HttpRequest::setConnection(const std::shared_ptr<ngx_connection_s>& conn)
+{
+    connection_ = conn;
+}
+
+std::string HttpRequest::getPeerIp() const
+{
+    auto conn = connection_.lock();
+    if (!conn) {
+        return "0.0.0.0"; // 连接已经无效
+    }
+
+    char ip[INET_ADDRSTRLEN] = {0}; // IPv4地址长度
+    struct sockaddr_in* addr_in = (struct sockaddr_in*)&conn->s_sockaddr;
+    inet_ntop(AF_INET, &(addr_in->sin_addr), ip, INET_ADDRSTRLEN);
+    return std::string(ip);
+}
 
 
 }

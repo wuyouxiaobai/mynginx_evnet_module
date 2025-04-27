@@ -12,7 +12,6 @@
 #include <thread>
 #include "my_crc32.h"
 #include <memory>
-#include "my_http_context.h"
 #include <functional>
 #include "Buffer.h"
 #include "my_logger.h"
@@ -35,7 +34,7 @@ namespace WYXB
 
 
 
-
+class HttpContext; 
 class CSocket;
 class Server;
 struct ngx_listening_s;

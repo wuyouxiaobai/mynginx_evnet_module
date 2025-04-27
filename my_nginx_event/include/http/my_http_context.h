@@ -6,6 +6,8 @@
 
 namespace WYXB
 {
+
+struct ngx_connection_s;
 const size_t LARGE_FILE_THRESHOLD = 1 * 1024 * 1024; // 最大内存缓冲1MB
 class HttpContext 
 {
@@ -18,9 +20,12 @@ public:
         kGotAll, // 解析完成
     };
     
-    HttpContext()
+    HttpContext(std::shared_ptr<ngx_connection_s> conn)
     : state_(kExpectRequestLine)
-    {buffer_.reserve(2 * 1024 * 1024);}
+    {
+        buffer_.reserve(2 * 1024 * 1024);
+        request_.setConnection(conn);
+    }
 
     bool parseRequest(std::vector<uint8_t> buf, bool& isErr, std::chrono::system_clock::time_point receiveTime);
     bool gotAll() const 
