@@ -202,14 +202,10 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
     {
         // 处理请求前的中间件
         HttpRequest mutableReq = req;
-        // Logger::ngx_log_stderr(0, "middlewareChain_ 前 .........");
         middlewareChain_.processBefore(mutableReq);
-        // Logger::ngx_log_stderr(0, "middlewareChain_ 后 .........");
         // 路由处理
         if (!m_Router->route(mutableReq, resp))
         {
-            // LOG_INFO << "请求的啥，url：" << req.method() << " " << req.path();
-            // LOG_INFO << "未找到路由，返回404";
             Logger::ngx_log_stderr(0, "Not Found .........");
             resp->setStatusCode(HttpResponse::k404NotFound);
             resp->setStatusMessage("Not Found");

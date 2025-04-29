@@ -293,6 +293,8 @@ public:
         instance().ngx_signal_handler(signo, siginfo, ucontext);
     }
 
+
+
 private:
     // 信号配置数组
     static ngx_signal_t signals[];

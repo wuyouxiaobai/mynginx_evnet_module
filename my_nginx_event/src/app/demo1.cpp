@@ -1,6 +1,6 @@
 #include "my_server.h"
 
-
+#include "middleware/Rate_Limiting_Algorithm/RateLimiterMiddleware.h"
 /// 路由相关
 // 初始化时注册
 // 文件重命名
@@ -429,6 +429,9 @@ int main(int argc, char*const *argv)
     //         }
     //     }
     // );
+    // 添加限流中间件（全局100QPS，突发不超过200）
+    WYXB::Server::instance().addMiddleware(std::make_shared<WYXB::RateLimiterMiddleware>(200, 100.0));
+
     int exitcode = WYXB::Server::instance().run(argc, argv);
     return exitcode;
 }
