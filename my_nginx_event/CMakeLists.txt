@@ -23,6 +23,7 @@ endforeach()
 # 查找src目录下的所有子目录中的cpp文件
 file(GLOB_RECURSE SOURCES
     src/*/*.cpp
+    src/*/*/*.cpp
 )
 
 # 设置可执行文件的输出目录

@@ -1,15 +1,14 @@
 // TokenBucket.h
-#pragma once
 #include <chrono>
 #include <mutex>
 #include <atomic>
-#include "TokenBucket.h"
+#include "Rate_Limiting_Algorithm/TokenBucket.h"
 
 namespace WYXB{
 
 
 
-bool TokenBucket::try_consume(uint32_t tokens = 1) {
+bool TokenBucket::try_consume(uint32_t tokens) {
     std::lock_guard<std::mutex> lock(mutex_);
     refill_tokens(); // 先补充令牌
     
