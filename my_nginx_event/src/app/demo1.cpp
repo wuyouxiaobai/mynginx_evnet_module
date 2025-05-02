@@ -432,6 +432,19 @@ int main(int argc, char*const *argv)
     // 添加限流中间件（全局100QPS，突发不超过200）
     WYXB::Server::instance().addMiddleware(std::make_shared<WYXB::RateLimiterMiddleware>(200, 100.0));
 
+
+    //示例使用内存存储
+    // 创建会话存储
+    auto sessionStorage = std::make_unique<WYXB::MemorySessionStorage>(); 
+    // 创建会话管理器
+    auto sessionManager = std::make_unique<WYXB::SessionManager>(std::move(sessionStorage));
+    // 设置会话管理器
+    WYXB::Server::instance().setSessionManager(std::move(sessionManager));
+
+
+    // 获得mysql连接
+    auto conn = WYXB::Server::instance().getConn();
+
     int exitcode = WYXB::Server::instance().run(argc, argv);
     return exitcode;
 }

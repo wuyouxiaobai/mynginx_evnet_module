@@ -259,13 +259,7 @@ void CLogicSocket::InitMiddleware()
 // 初始化时注册
 void CLogicSocket::InitSessionManager()
 {
-//示例使用内存存储
-    // 创建会话存储
-    auto sessionStorage = std::make_unique<MemorySessionStorage>(); 
-    // 创建会话管理器
-    auto sessionManager = std::make_unique<SessionManager>(std::move(sessionStorage));
-    // 设置会话管理器
-    setSessionManager(std::move(sessionManager));
+
 }
 
 
@@ -274,7 +268,7 @@ void CLogicSocket::InitSessionManager()
 // 初始化时
 void CLogicSocket::InitMysql() 
 {
-    dbconn_ = ConnectionPool::getInstance()->getConnection();
+
 }
 
 
