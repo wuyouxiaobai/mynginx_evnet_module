@@ -35,19 +35,33 @@ bool MySQLConn::update(std::string sql)
     }
     
 }
-bool MySQLConn::query(std::string sql)
-{
+nlohmann::json MySQLConn::query(const std::string& sql) {
     freeResult();
-    if(mysql_query(conn_, sql.c_str()) == 0)
-    {
-        result_ = mysql_store_result(conn_);
-        return true;
+    nlohmann::json result = nlohmann::json::array();
+
+    if (mysql_query(conn_, sql.c_str()) != 0) {
+        return result;  // 返回空数组
     }
-    else
-    {
-        return false;
+
+    result_ = mysql_store_result(conn_);
+    if (!result_) return result;
+
+    int num_fields = mysql_num_fields(result_);
+    MYSQL_ROW row;
+    MYSQL_FIELD* fields = mysql_fetch_fields(result_);
+
+    while ((row = mysql_fetch_row(result_))) {
+        nlohmann::json obj;
+        for (int i = 0; i < num_fields; ++i) {
+            std::string field = fields[i].name;
+            obj[field] = row[i] ? row[i] : "NULL";
+        }
+        result.push_back(obj);
     }
+
+    return result;
 }
+
 // 遍历查询的结果
 bool MySQLConn::next()
 {

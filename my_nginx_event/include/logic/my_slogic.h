@@ -83,13 +83,17 @@ private:
 /// 数据库相关
     // 初始化时
     void InitMysql() ;
-    std::shared_ptr<WYXB::MySQLConn> getConn() {   
-        dbconn_ = ConnectionPool::getInstance()->getConnection();
-        return dbconn_;
-    }
-    
-    std::shared_ptr<MySQLConn> dbconn_;
 
+    ConnectionPool* connPool_{NULL};
+    
+    // std::shared_ptr<MySQLConn> dbconn_;
+
+public:
+    std::shared_ptr<MySQLConn> getConn() {   
+        if(connPool_ != NULL)
+            return connPool_->getConnection();
+        return nullptr;
+    }
 
 };
 

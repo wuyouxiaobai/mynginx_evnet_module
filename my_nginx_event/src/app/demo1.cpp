@@ -75,17 +75,7 @@ int main(int argc, char*const *argv)
     // );
 
 
-    WYXB::Server::instance().get( 
-        "/hello", 
-        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
-            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
-            // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
-            resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
-            std::string respstr = "hello world";
-            resp->setBody(respstr); // 直接返回中文文本
-            resp->setContentLength(respstr.size());
-        }
-    );
+
 
     // 新增HTML文件路由
     WYXB::Server::instance().get( 
@@ -444,7 +434,31 @@ int main(int argc, char*const *argv)
 
     // 获得mysql连接
     auto conn = WYXB::Server::instance().getConn();
+    if(conn == nullptr)
+        std::cout << "empty Connection" << std::endl;
 
+
+    WYXB::Server::instance().get("/hello_db", [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+        auto conn = WYXB::Server::instance().getConn();  // 这里执行在子进程中，安全
+        auto result = conn->query("SELECT * FROM users");
+        resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+        resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
+        
+        resp->setContentLength(result.dump().size());
+        resp->setBody(result.dump());
+    });
+        
+    WYXB::Server::instance().get( 
+        "/hello", 
+        [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+            resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+            // resp->addHeader("Keep-Alive", "timeout=500, max=1000");  
+            resp->setContentType("text/plain; charset=utf-8"); // 显式设置编码
+            std::string respstr = "hello world";
+            resp->setBody(respstr); // 直接返回中文文本
+            resp->setContentLength(respstr.size());
+        }
+    );
     int exitcode = WYXB::Server::instance().run(argc, argv);
     return exitcode;
 }

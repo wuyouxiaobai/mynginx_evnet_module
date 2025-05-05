@@ -22,7 +22,7 @@ bool CLogicSocket::Initialize()
     InitRouter();
     InitMiddleware();
     InitSessionManager();
-    // InitMysql() ;
+    InitMysql() ;
     return true;
 }
 
@@ -268,7 +268,7 @@ void CLogicSocket::InitSessionManager()
 // 初始化时
 void CLogicSocket::InitMysql() 
 {
-
+    connPool_ = ConnectionPool::getInstance();
 }
 
 

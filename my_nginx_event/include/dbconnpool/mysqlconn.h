@@ -2,7 +2,7 @@
 #include <mysql/mysql.h>
 #include <string>
 #include <chrono>
-
+#include <nlohmann/json.hpp>
 
 namespace WYXB
 {
@@ -13,7 +13,7 @@ public:
 	~MySQLConn();
 	bool connect(std::string ip, std::string user, std::string pwd, std::string dbname, unsigned int port=3306);
 	bool update(std::string sql);
-    bool query(std::string sql);
+    nlohmann::json query(const std::string& sql);
     // 遍历查询的结果
     bool next();
     // 获取查询结果
