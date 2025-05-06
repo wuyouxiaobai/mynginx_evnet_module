@@ -431,13 +431,54 @@ int main(int argc, char*const *argv)
     // 设置会话管理器
     WYXB::Server::instance().setSessionManager(std::move(sessionManager));
 
+    WYXB::Server::instance().get("/test_session", [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
+        auto sessionMgr = WYXB::Server::instance().getSessionManager();
+        if (!sessionMgr) {
+            resp->setStatusCode(WYXB::HttpResponse::k500InternalServerError);
+            resp->setBody("SessionManager not available");
+            resp->setContentLength(sizeof("SessionManager not available"));
+            return;
+        }
+    
+        // 获取（或创建）会话
+        auto session = sessionMgr->getSession(req, resp);
+    
+        // 检查是否已有访问次数
+        int visitCount = 0;
+        std::string visitStr = session->getValue("visits");
+        if (!visitStr.empty()) {
+            try {
+                visitCount = std::stoi(visitStr);
+            } catch (...) {
+                visitCount = 0;
+            }
+        }
+    
+        visitCount += 1;
+    
+        // 存入新值
+        session->setValue("visits", std::to_string(visitCount));
+    
+        // 保存会话
+        sessionMgr->updateSession(session);
+    
+        // 构造响应
+        nlohmann::json result = {
+            {"session_id", session->getId()},
+            {"visits", visitCount},
+            {"message", "Session test successful"}
+        };
+        std::string body = result.dump();
+        resp->setStatusLine(req.getVersion(), WYXB::HttpResponse::HttpStatusCode::k200Ok, "OK");
+        resp->setContentType("application/json; charset=utf-8");
+        resp->setContentLength(body.size());
+        resp->setBody(body);
+    });
+    
+    
+
 
     // 获得mysql连接
-    auto conn = WYXB::Server::instance().getConn();
-    if(conn == nullptr)
-        std::cout << "empty Connection" << std::endl;
-
-
     WYXB::Server::instance().get("/hello_db", [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
         auto conn = WYXB::Server::instance().getConn();  // 这里执行在子进程中，安全
         auto result = conn->query("SELECT * FROM users");

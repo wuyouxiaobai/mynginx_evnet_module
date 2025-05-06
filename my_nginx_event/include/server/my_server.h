@@ -98,7 +98,7 @@ public:
         g_socket->setSessionManager(std::move(sessionManager));
     }
 
-    SessionManager* getSessionManager() { return getSessionManager(); }
+    SessionManager* getSessionManager() { return g_socket->getSessionManager(); }
 
     std::shared_ptr<WYXB::MySQLConn> getConn() {   
         
