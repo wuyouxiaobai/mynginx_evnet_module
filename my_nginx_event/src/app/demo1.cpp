@@ -285,7 +285,8 @@ int main(int argc, char*const *argv)
     );
 
 
-    WYXB::Server::instance().get(
+    // 动态路由
+    WYXB::Server::instance().getRegex(
         "/video/:filename",
         [](const WYXB::HttpRequest& req, WYXB::HttpResponse* resp) {
             // 获取 '/video/' 后面的文件名

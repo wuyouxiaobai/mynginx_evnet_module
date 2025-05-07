@@ -38,6 +38,7 @@ private:
 public:
     // 动态注册
     void registCallback(HttpRequest::Method method, const std::string &path, const Router::HandlerCallback &callback);
+    void addRegexCallback(HttpRequest::Method method, const std::string &path, const Router::HandlerCallback &callback);
 private:
     void onRequest(lpngx_connection_t conn, const HttpRequest &req);
     void handleRequest(const HttpRequest &req, HttpResponse *resp);

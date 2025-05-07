@@ -34,6 +34,10 @@ void CLogicSocket::registCallback(HttpRequest::Method method, const std::string 
     m_Router->registerCallback(method, path, callback);
 }
 
+void CLogicSocket::addRegexCallback(HttpRequest::Method method, const std::string &path, const Router::HandlerCallback &callback)
+{
+    m_Router->addRegexCallback(method, path, callback);
+}
 
 //处理接收消息队列中的消息，由线程池调用
 void CLogicSocket::threadRecvProcFunc(STRUC_MSG_HEADER msghead, std::vector<uint8_t> pMsgBuf)
@@ -203,10 +207,11 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
         // 处理请求前的中间件
         HttpRequest mutableReq = req;
         middlewareChain_.processBefore(mutableReq);
+        Logger::ngx_log_stderr(0, "test handleRequest %s, %d", mutableReq.path().c_str(), mutableReq.method());
         // 路由处理
         if (!m_Router->route(mutableReq, resp))
         {
-            Logger::ngx_log_stderr(0, "Not Found .........");
+            Logger::ngx_log_stderr(0, "Not Found ........");
             resp->setStatusCode(HttpResponse::k404NotFound);
             resp->setStatusMessage("Not Found");
             resp->setCloseConnection(true);
@@ -214,7 +219,7 @@ void CLogicSocket::handleRequest(const HttpRequest &req, HttpResponse *resp)
         }
 
         // 处理响应后的中间件
-        // Logger::ngx_log_stderr(0, "middlewareChain_ processAfter前 .........");
+        Logger::ngx_log_stderr(0, "middlewareChain_ processAfter前 .........");
         middlewareChain_.processAfter(*resp);
         // Logger::ngx_log_stderr(0, "middlewareChain_ processAfter后 .........");
     }

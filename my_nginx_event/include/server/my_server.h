@@ -74,6 +74,19 @@ public:
         return on(HttpRequest::Method::kDelete, path, cb);
     }
 
+    Server& onRegex(HttpRequest::Method method, const std::string& path, const Router::HandlerCallback& cb) {
+        g_socket->addRegexCallback(method, path, cb);
+        return *this;
+    }
+    
+    Server& getRegex(const std::string& path, const Router::HandlerCallback& cb) {
+        return onRegex(HttpRequest::Method::kGet, path, cb);
+    }
+    
+    Server& postRegex(const std::string& path, const Router::HandlerCallback& cb) {
+        return onRegex(HttpRequest::Method::kPost, path, cb);
+    }
+    
     void freeresource() {
         if (gp_envmem) {
             delete[] gp_envmem;
